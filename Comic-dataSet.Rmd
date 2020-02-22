@@ -7,18 +7,43 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+#limpiar el enviroment
+rm(list = ls())
+
 #librerias base
 library(tidyverse)
 library(readr)
 library(lubridate)
+library(ggplot2)
+library(ggpubr)
+library(plotly) # Interactive visualizations
+library(ggthemes) # Visualization themes
+library(viridis) # Color scales
+library(corrplot) # Correlation visualizations
+library(gridExtra) # Grids for visualizations
+library(magrittr) # needs to be run every time you start R and want to use %>%
+library(dplyr)    # alternatively, this also loads %>%
+
+theme_set(theme_pubr())
 ```
+## DEFINICION DE FUNCIONES AUXILIARES
 
-## Lectura Inicial de los archivos del DataSet
+Creamos dos funciones para uso posterior en el dataset, una para la matrix de correlacion y otra para el calculo de la decada de aparicion de los personajes.
 
+```{r Funciones iniciales}
 
-Cargamos los dataset en dos dataframes DC y Marvel, y luego agregamos una columna con el nombre de la marca, previo a su fusion en un archivo llamado allcomics
-
-```{r comics}
+###############################################################################
+#
+# cor2
+# -- Compute correlations of columns of a dataframe of mixed types
+#
+###############################################################################
+#
+# author  : Srikanth KS (talegari)
+# license : GNU AGPLv3 (http://choosealicense.com/licenses/agpl-3.0/)
+# https://gist.github.com/talegari/b514dbbc651c25e2075d88f31d48057b
+###############################################################################
 
 cor2 = function(df){
   
@@ -76,25 +101,258 @@ cor2 = function(df){
   
   return(corrmat)
 }
+##################################################################
+# FIN DE FUNCION COR2
+#
+################################################################
 
+################################################################
+#FUNCION PARA CALCULO DE DECADA
+floor_decade    = function(value){ return(value - value %% 10) }
+################################################################
 
-#carga de los archivos
+```
+## Lectura Inicial DEL DATASET DE DC
+
+Cargamos los dataset en dos dataframes DC 
+
+```{r DC comics}
+
+#################################################################
+###########INICIO LECTURA Y DETECCION DE DATOS VACIOS############
+#################################################################
+
 getwd()
 dir()
-dc <- read.csv("dc-wikia-data.csv")
+dcoriginal <- read.csv("dc-wikia-data.csv")
+dc<-dcoriginal
+str(dc)
+summary(dc)
 
 #TRATAMIENTO DE COLUMNAS TIPO STRING
 dc$name <- as.character(dc$name)
 dc$urlslug <- as.character(dc$urlslug)
 dc$FIRST.APPEARANCE <- as.character(dc$FIRST.APPEARANCE)
 
-#ADICION DE COLUMNA DE LA MARCA DEL COMIC, 0 DC, 1 para MARVEL
-dc$BRAND <- 0
 
+summary(dc)
+str(dc)
+
+length(which(is.na(dc$page_id)))
+length(which(dc$page_id==''))
+
+length(which(is.na(dc$name)))
+length(which(dc$name==''))
+
+length(which(is.na(dc$urlslug)))
+length(which(dc$urlslug==''))
+
+length(which(is.na(dc$ID)))
+length(which(dc$ID==''))
+
+length(which(is.na(dc$ALIGN)))
+length(which(dc$ALIGN==''))
+
+length(which(is.na(dc$EYE)))
+length(which(dc$EYE==''))
+
+length(which(is.na(dc$HAIR)))
+length(which(dc$HAIR==''))
+
+length(which(is.na(dc$SEX)))
+length(which(dc$SEX==''))
+
+length(which(is.na(dc$GSM)))
+length(which(dc$GSM==''))
+
+length(which(is.na(dc$ALIVE)))
+length(which(dc$ALIVE==''))
+
+length(which(is.na(dc$APPEARANCES)))
+length(which(dc$APPEARANCES==''))
+
+length(which(is.na(dc$FIRST.APPEARANCE)))
+length(which(dc$FIRST.APPEARANCE==''))
+
+length(which(is.na(dc$YEAR)))
+length(which(dc$YEAR==''))
+
+#################################################################
+#############FIN LECTURA Y DETECCION DE DATOS VACIOS#############
+#################################################################
+
+
+#################################################################
+#############INICIO TRATAMIENTO DE VALORES VACIOS################
+#################################################################
+summary(dc)
+str(dc)
+
+#PARA ID FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$ID <- as.character(dc$ID) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$ID[dc$ID==''] <- 'NOT SPECIFIED' 
+dc$ID <- factor (dc$ID) #RECONVERSION A FACTOR
+
+#PARA ALIGN FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$ALIGN <- as.character(dc$ALIGN) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$ALIGN[dc$ALIGN==''] <- 'NOT SPECIFIED' 
+dc$ALIGN <- factor (dc$ALIGN) #RECONVERSION A FACTOR
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$EYE <- as.character(dc$EYE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$EYE[dc$EYE==''] <- 'NOT SPECIFIED' 
+dc$EYE <- factor (dc$EYE) #RECONVERSION A FACTOR
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$HAIR <- as.character(dc$HAIR) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$HAIR[dc$HAIR==''] <- 'NOT SPECIFIED' 
+dc$HAIR <- factor (dc$HAIR) #RECONVERSION A FACTOR
+
+#PARA SEX FALTANTES: LUEGO DE UNA ASIGNACION MANUAL SEGUN CORRESPONDA CON INFORMACION DE INTERNET
+which(dc$SEX=='')
+dc$SEX <- as.character(dc$SEX)
+dc[243, 'SEX'] <- 'Male Characters'
+dc[344, 'SEX'] <- 'Female Characters'
+dc[353, 'SEX'] <- 'Male Characters'
+dc[515, 'SEX'] <- 'Male Characters'
+dc[629, 'SEX'] <- 'Male Characters'
+dc[684, 'SEX'] <- 'Female Characters'
+dc[753, 'SEX'] <- 'Male Characters'
+dc[836, 'SEX'] <- 'Male Characters'
+dc[1075, 'SEX'] <- 'Male Characters'
+dc[1156, 'SEX'] <- 'Male Characters'
+dc[1164, 'SEX'] <- 'Male Characters'
+dc[1236, 'SEX'] <- 'Male Characters'
+dc[1271, 'SEX'] <- 'Male Characters'
+dc[1434, 'SEX'] <- 'Male Characters'
+dc[1470, 'SEX'] <- 'Male Characters'
+dc[1472, 'SEX'] <- 'Male Characters'
+dc[1615, 'SEX'] <- 'Female Characters'
+dc[1617, 'SEX'] <- 'Male Characters'
+dc[1618, 'SEX'] <- 'Male Characters'
+dc[1769, 'SEX'] <- 'Male Characters'
+dc[1795, 'SEX'] <- 'Male Characters'
+dc[1811, 'SEX'] <- 'Male Characters'
+dc[1819, 'SEX'] <- 'Male Characters'
+dc[1889, 'SEX'] <- 'Male Characters'
+dc[2072, 'SEX'] <- 'Male Characters'
+dc[2101, 'SEX'] <- 'Male Characters'
+dc[2154, 'SEX'] <- 'Female Characters'
+dc[2158, 'SEX'] <- 'Male Characters'
+dc[2195, 'SEX'] <- 'Male Characters'
+dc[2662, 'SEX'] <- 'Male Characters'
+dc[2667, 'SEX'] <- 'Male Characters'
+dc[2670, 'SEX'] <- 'Male Characters'
+dc[2840, 'SEX'] <- 'Male Characters'
+dc[3083, 'SEX'] <- 'Male Characters'
+dc[3096, 'SEX'] <- 'Male Characters'
+dc[3131, 'SEX'] <- 'Male Characters'
+dc[3171, 'SEX'] <- 'Male Characters'
+dc[3194, 'SEX'] <- 'Male Characters'
+dc[3355, 'SEX'] <- 'Male Characters'
+
+#CONTRASTAMOS LA PREDOMINACION MASCULINA, POR LO QUE SE OPTA POR REEMPLAZAR EL VALOR POR LA MODA.
+dc$SEX[dc$SEX==''] <- 'Male Characters' 
+
+#DETECTAMOS "TRANSGENDER" Y "GENDERLESS" COMO SEXO
+#PROCEDEMOS CON LA DEPURACION DE TRANSGENDER Y GENDERLESS COMO SEXO, Y ASIGNACION DEL GENERO A LA VARIABLE CORRECTA "GSM".
+which(dc$SEX=='Transgender Characters')
+which(dc$SEX=='Genderless Characters')
+
+dc[3878, 'SEX'] <- 'Female Characters'
+dc[797, 'SEX'] <- 'Male Characters'
+dc[906, 'SEX'] <- 'Male Characters'
+dc[907, 'SEX'] <- 'Male Characters'
+dc[921, 'SEX'] <- 'Male Characters'
+dc[1123, 'SEX'] <- 'Male Characters'
+dc[1295, 'SEX'] <- 'Male Characters'
+dc[1871, 'SEX'] <- 'Male Characters'
+dc[2146, 'SEX'] <- 'Male Characters'
+dc[2255, 'SEX'] <- 'Male Characters'
+dc[2678, 'SEX'] <- 'Male Characters'
+dc[2801, 'SEX'] <- 'Male Characters'
+dc[3608, 'SEX'] <- 'Male Characters'
+dc[3729, 'SEX'] <- 'Male Characters'
+dc[4092, 'SEX'] <- 'Male Characters'
+dc[5014, 'SEX'] <- 'Male Characters'
+dc[5080, 'SEX'] <- 'Male Characters'
+dc[5336, 'SEX'] <- 'Male Characters'
+dc[5844, 'SEX'] <- 'Male Characters'
+dc[5857, 'SEX'] <- 'Male Characters'
+dc[6854, 'SEX'] <- 'Male Characters'
+
+dc$GSM <- as.character (dc$GSM)
+dc[797, 'GSM'] <- 'Agender Characters'
+dc[906, 'GSM'] <- 'Agender Characters'
+dc[907, 'GSM'] <- 'Agender Characters'
+dc[921, 'GSM'] <- 'Agender Characters'
+dc[1123, 'GSM'] <- 'Agender Characters'
+dc[1295, 'GSM'] <- 'Agender Characters'
+dc[1871, 'GSM'] <- 'Agender Characters'
+dc[2146, 'GSM'] <- 'Agender Characters'
+dc[2255, 'GSM'] <- 'Agender Characters'
+dc[2678, 'GSM'] <- 'Agender Characters'
+dc[2801, 'GSM'] <- 'Agender Characters'
+dc[3608, 'GSM'] <- 'Agender Characters'
+dc[3729, 'GSM'] <- 'Agender Characters'
+dc[4092, 'GSM'] <- 'Agender Characters'
+dc[5014, 'GSM'] <- 'Agender Characters'
+dc[5080, 'GSM'] <- 'Agender Characters'
+dc[5336, 'GSM'] <- 'Agender Characters'
+dc[5844, 'GSM'] <-'Agender Characters'
+dc[5857, 'GSM'] <- 'Agender Characters'
+dc[6854, 'GSM'] <- 'Agender Characters'
+dc[3878, 'GSM'] <- 'Agender Characters'
+dc[1295, 'GSM'] <- 'Genderfluid Characters'
+dc$SEX <- factor (dc$SEX) #RECONVERSION A FACTOR
+dc$GSM <- factor (dc$GSM) #RECONVERSION A FACTOR
+
+
+#PARA GSM FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$GSM <- as.character(dc$GSM) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$GSM[dc$GSM==''] <- 'NOT SPECIFIED' 
+dc$GSM <- factor (dc$GSM) #RECONVERSION A FACTOR
+
+
+#PARA ALIVE FALTANTES: LOS ASIGNAREMOS SEGUN CORRESPONDA CON INFORMACION DE INTERNET
+which(dc$ALIVE=='')
+dc$ALIVE <- as.character(dc$ALIVE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc[2727, 'ALIVE'] <- 'Living Characters'
+dc[3251, 'ALIVE'] <- 'Living Characters'
+dc[6855, 'ALIVE'] <- 'Living Characters'
+dc$ALIVE <- factor (dc$ALIVE) #RECONVERSION A FACTOR
+
+
+
+#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS SEGUN EL PROMEDIO DE LA VARIABLE
+dc$APPEARANCES[is.na(dc$APPEARANCES)]<-ceiling(mean(dc$APPEARANCES,na.rm=TRUE))
+
+#PARA FIRST.APPEARANCE FALTANTES: ELIMINACION DE OBSERVACIONES
+dc<-subset(dc, !is.na(dc$FIRST.APPEARANCE) | dc$FIRST.APPEARANCE=='')
+
+#PARA YEAR: ELIMINACION DE OBSERVACIONES
+dc<-subset(dc, !is.na(dc$YEAR))
+
+
+#################################################################
+################FIN TRATAMIENTO DE VALORES VACIOS################
+#################################################################
+
+
+#################################################################
+################INICIO CREACION DE VARIABLES#####################
+#################################################################
 
 #AGREGA COLUMNA CON EL PARSEO DE FECHA DE APARICION DE STRING A DATE
 dc$FECHA.APARICION<-parse_date_time(dc$FIRST.APPEARANCE, orders = c("Yb"))
 dc$FECHA.APARICION <- as.Date(dc$FECHA.APARICION)
+
+#CORRECCION DE ERRORES DEL PARSEO DE FECHA
+which(is.na(dc$FECHA.APARICION))
+#SE REVISA QUE CONTIENEN FECHAS INCOMPLETAS, SE PROCEDE A ELIMINAR LOS REGISTROS CON FECHAS ERRONEAS.
+dc<-subset(dc, !is.na(dc$FECHA.APARICION))
+#ELIMINACION DE COLUMNA DE FECHA ORIGINAL SIN PARSEAR
+dc[ ,c('FIRST.APPEARANCE')] <- list(NULL)
 
 #AGREGA COLUMNA CON EL PARSEO MES DE APARICION
 dc$MES.APARICION <- ymd(dc$FECHA.APARICION) %>% 
@@ -104,29 +362,199 @@ dc$MES.APARICION <- ymd(dc$FECHA.APARICION) %>%
 dc$TRIMESTRE.APARICION<- ymd(dc$FECHA.APARICION) %>%
    lubridate::quarter()  # Grab quarter.
 
-#TRATAMIENTO DE FECHAS VACIAS EN FIRST APPEARANCE y en YEAR
-which(is.na(dc$FIRST.APPEARANCE))
-dc$FIRST.APPEARANCE[is.na(dc$FIRST.APPEARANCE)] <- '#NA'
-dc$FIRST.APPEARANCE[dc$FIRST.APPEARANCE==''] <- '#NA'
+#AGREGA COLUMNA CON LA DECADA DE APARICION
+dc$DECADA.APARICION <- floor_decade(dc$YEAR)
 
-which(is.na(dc$YEAR))
-dc$YEAR[is.na(dc$YEAR)] <- '#NA'
-dc$YEAR[dc$YEAR==''] <- '#NA'
+summary(dc)
+
+#################################################################
+################FIN CREACION DE VARIABLES########################
+#################################################################
+
+#################################################################
+#############INICIO CORRELACION DE VARIABLES#####################
+#################################################################
 
 
-marvel <- read.csv("marvel-wikia-data.csv")
+dccorrelation<-dc
+dccorrelation[ ,c('page_id','name', 'urlslug','EYE','HAIR')] <- list(NULL)
+summary(dccorrelation)
+
+dccorrelation$ID<-as.numeric(dccorrelation$ID)
+dccorrelation$ALIGN<-as.numeric(dccorrelation$ALIG)
+dccorrelation$SEX<-as.numeric(dccorrelation$SEX)
+dccorrelation$GSM<-as.numeric(dccorrelation$GSM)
+dccorrelation$ALIVE<-as.numeric(dccorrelation$ALIVE)
+dccorrelation$FECHA.APARICION<-as.numeric((dccorrelation$FECHA.APARICION))
+dccorrelation$YEAR<-as.numeric(dccorrelation$YEAR)
+dccorrelation$MES.APARICION<-as.numeric(dccorrelation$MES.APARICION)
+dccorrelation$TRIMESTRE.APARICION<-as.numeric(dccorrelation$TRIMESTRE.APARICION)
+str(dccorrelation)
+view(dccorrelation)
+
+cor(dccorrelation)
+
+#################################################################
+################FIN CORRELACION DE VARIABLES#####################
+#################################################################
+
+```
+
+## Lectura Inicial DEL DATASET DE MARVEL
+
+
+CARGA DEL DATASET DE MARVEL COMICS 
+
+```{r MARVEL comics}
+
+
+#################################################################
+###########INICIO LECTURA Y DETECCION DE DATOS VACIOS############
+#################################################################
+marveloriginal <- read.csv("marvel-wikia-data.csv")
+str(marveloriginal)
+summary(marveloriginal)
+#HOMOGENIZACION DE NOMBRES DE VARIABLES
+names(marveloriginal) <- names(dcoriginal) 
+
+
+#TRATAMIENTO DE COLUMNAS TIPO STRING
+marvel<-marveloriginal
 marvel$name <- as.character(marvel$name)
 marvel$urlslug <- as.character(marvel$urlslug)
 marvel$FIRST.APPEARANCE <- as.character(marvel$FIRST.APPEARANCE)
 
+summary(marvel)
+str(marvel)
 
-#ADICION DE COLUMNA DE LA MARCA DEL COMIC, 1 para marvel
-marvel$BRAND <- 1
+length(which(is.na(marvel$page_id)))
+length(which(marvel$page_id==''))
 
+length(which(is.na(marvel$name)))
+length(which(marvel$name==''))
+
+length(which(is.na(marvel$urlslug)))
+length(which(marvel$urlslug==''))
+
+length(which(is.na(marvel$ID)))
+length(which(marvel$ID==''))
+
+length(which(is.na(marvel$ALIGN)))
+length(which(marvel$ALIGN==''))
+
+length(which(is.na(marvel$EYE)))
+length(which(marvel$EYE==''))
+
+length(which(is.na(marvel$HAIR)))
+length(which(marvel$HAIR==''))
+
+length(which(is.na(marvel$SEX)))
+length(which(marvel$SEX==''))
+
+length(which(is.na(marvel$GSM)))
+length(which(marvel$GSM==''))
+
+length(which(is.na(marvel$ALIVE)))
+length(which(marvel$ALIVE==''))
+
+length(which(is.na(marvel$APPEARANCES)))
+length(which(marvel$APPEARANCES==''))
+
+length(which(is.na(marvel$FIRST.APPEARANCE)))
+length(which(marvel$FIRST.APPEARANCE==''))
+
+length(which(is.na(marvel$YEAR)))
+length(which(marvel$YEAR==''))
+
+
+#################################################################
+#############FIN LECTURA Y DETECCION DE DATOS VACIOS#############
+#################################################################
+
+
+#################################################################
+#############INICIO TRATAMIENTO DE VALORES VACIOS################
+#################################################################
+summary(marvel)
+str(marvel)
+
+#PARA ID FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$ID <- as.character(marvel$ID) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$ID[marvel$ID==''] <- 'NOT SPECIFIED' 
+marvel$ID <- factor (marvel$ID) #RECONVERSION A FACTOR
+
+#PARA ALIGN FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$ALIGN <- as.character(marvel$ALIGN) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$ALIGN[marvel$ALIGN==''] <- 'NOT SPECIFIED' 
+marvel$ALIGN <- factor (marvel$ALIGN) #RECONVERSION A FACTOR
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$EYE <- as.character(marvel$EYE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$EYE[marvel$EYE==''] <- 'NOT SPECIFIED' 
+marvel$EYE <- factor (marvel$EYE) #RECONVERSION A FACTOR
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$HAIR <- as.character(marvel$HAIR) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$HAIR[marvel$HAIR==''] <- 'NOT SPECIFIED' 
+marvel$HAIR <- factor (marvel$HAIR) #RECONVERSION A FACTOR
+
+#PARA SEX FALTANTES: POR LO QUE SE OPTA POR REEMPLAZAR EL VALOR POR LA MODA.
+length(which(marvel$SEX==''))
+marvel$SEX[marvel$SEX==''] <- 'Male Characters' 
+
+#DETECTAMOS "AGENDER" Y "GENDERFLUID" COMO SEXO
+#PROCEDEMOS CON LA DEPURACION DE TRANSGENDER Y GENDERLESS COMO SEXO, Y ASIGNACION DEL GENERO A LA VARIABLE CORRECTA "GSM".
+length(which(marvel$SEX=='Agender Characters'))
+length(which(marvel$SEX=='Genderfluid Characters'))
+marvel$GSM <- as.character (marvel$GSM)
+marvel$GSM[marvel$SEX=='Agender Characters'] <- 'Agender Characters' 
+marvel$GSM[marvel$SEX=='Genderfluid Characters'] <- 'Genderfluid Characters' 
+marvel$SEX[marvel$SEX=='Agender Characters'] <- 'Male Characters' 
+marvel$SEX[marvel$SEX=='Genderfluid Characters'] <- 'Male Characters' 
+marvel$SEX <- factor (marvel$SEX) #RECONVERSION A FACTOR
+marvel$GSM <- factor (marvel$GSM) #RECONVERSION A FACTOR
+
+
+#PARA GSM FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$GSM <- as.character(marvel$GSM) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$GSM[marvel$GSM==''] <- 'NOT SPECIFIED' 
+marvel$GSM <- factor (marvel$GSM) #RECONVERSION A FACTOR
+
+
+#PARA ALIVE FALTANTES: LOS ASIGNAREMOS SEGUN CORRESPONDA CON INFORMACION DE INTERNET
+which(marvel$ALIVE=='')
+marvel$ALIVE <- as.character(marvel$ALIVE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$ALIVE[marvel$ALIVE=='']<-'Living Characters'
+marvel$ALIVE <- factor (marvel$ALIVE) #RECONVERSION A FACTOR
+
+#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS SEGUN EL PROMEDIO DE LA VARIABLE
+marvel$APPEARANCES[is.na(marvel$APPEARANCES)]<-ceiling(mean(marvel$APPEARANCES,na.rm=TRUE))
+
+
+#PARA FIRST.APPEARANCE FALTANTES: ELIMINACION DE OBSERVACIONES
+marvel<-subset(marvel, !is.na(marvel$FIRST.APPEARANCE) | marvel$FIRST.APPEARANCE=='')
+
+#PARA YEAR: ELIMINACION DE OBSERVACIONES
+marvel<-subset(marvel, !is.na(marvel$YEAR))
+
+#################################################################
+################FIN TRATAMIENTO DE VALORES VACIOS################
+#################################################################
+
+
+#################################################################
+################INICIO CREACION DE VARIABLES#####################
+#################################################################
 
 #AGREGA COLUMNA CON EL PARSEO DE FECHA DE APARICION DE STRING A DATE
 marvel$FECHA.APARICION<-parse_date_time2(marvel$FIRST.APPEARANCE,"by", cutoff_2000 = 20)
 marvel$FECHA.APARICION <- as.Date(marvel$FECHA.APARICION)
+
+#CORRECCION DE ERRORES DEL PARSEO DE FECHA
+which(is.na(marvel$FECHA.APARICION))
+
+#ELIMINACION DE COLUMNA DE FECHA ORIGINAL SIN PARSEAR
+marvel[ ,c('FIRST.APPEARANCE')] <- list(NULL)
 
 #AGREGA COLUMNA CON EL PARSEO MES DE APARICION
 marvel$MES.APARICION <- ymd(marvel$FECHA.APARICION) %>% 
@@ -136,107 +564,194 @@ marvel$MES.APARICION <- ymd(marvel$FECHA.APARICION) %>%
 marvel$TRIMESTRE.APARICION<- ymd(marvel$FECHA.APARICION) %>%
    lubridate::quarter()  # Grab quarter.
 
+#AGREGA COLUMNA CON LA DECADA DE APARICION
+marvel$DECADA.APARICION <- floor_decade(marvel$YEAR)
 
-#mostrar estructura de los dataframes
-str(dc)
-str(marvel)
+summary(marvel)
 
-#mostrar summary con datos estadisticos de los dataframe
+#################################################################
+################FIN CREACION DE VARIABLES########################
+#################################################################
+
+#################################################################
+#############INICIO CORRELACION DE VARIABLES#####################
+#################################################################
+
+
+marvelcorrelation<-marvel
+marvelcorrelation[ ,c('page_id','name', 'urlslug','EYE','HAIR')] <- list(NULL)
+summary(marvelcorrelation)
+
+marvelcorrelation$ID<-as.numeric(marvelcorrelation$ID)
+marvelcorrelation$ALIGN<-as.numeric(marvelcorrelation$ALIG)
+marvelcorrelation$SEX<-as.numeric(marvelcorrelation$SEX)
+marvelcorrelation$GSM<-as.numeric(marvelcorrelation$GSM)
+marvelcorrelation$ALIVE<-as.numeric(marvelcorrelation$ALIVE)
+marvelcorrelation$FECHA.APARICION<-as.numeric((marvelcorrelation$FECHA.APARICION))
+marvelcorrelation$YEAR<-as.numeric(marvelcorrelation$YEAR)
+marvelcorrelation$MES.APARICION<-as.numeric(marvelcorrelation$MES.APARICION)
+marvelcorrelation$TRIMESTRE.APARICION<-as.numeric(marvelcorrelation$TRIMESTRE.APARICION)
+str(marvelcorrelation)
+view(marvelcorrelation)
+
+cor(marvelcorrelation)
+
+#################################################################
+################FIN CORRELACION DE VARIABLES#####################
+#################################################################
+
+
+
+
+```
+
+## Join de Marvel y DC Comics
+
+Creacion de un dataset con los personajes de ambas marcas, y la respectiva homogenizacion de las categorias.
+
+```{r allcomics}
+
+#################################################################
+################INICIO DE JOIN DE DATASETS ######################
+#################################################################
+
+#CREACION DE VARIABLE DE MARCA POR CADA COMIC
+dc$BRAND <-'DC'
+marvel$BRAND<-'MARVEL'
+
+#JOIN DE DATAFRAMES MARVEL Y DC
+allcomics<-rbind(dc,marvel)
+
+#ALEATORIEDAD DE OBSERVACIONES
+allcomics <- allcomics[sample(nrow(allcomics)),]
+
+
+str(allcomics)
+summary(allcomics)
 summary(dc)
-summary (marvel)
+summary(marvel)
 
-#mostrar breve resumen de los dataframes
-head(dc)
-head(marvel)
+allcomics[ ,c('FECHA.APARICION')] <- list(NULL)
 
-#mostrar los dataframes completos
-View(dc)
-view (marvel)
-
-#ELIMINACION DE COLUMNAS DISCORDANTES
-names(marvel) <- names(dc) 
-
-#JOIN DE DATAFRAMES MARVEL Y DC, sin columna FIRST APPEARRANCE por tener formato discordante, la fecha ya fue unificada como FECHA.INICIO
-
-allcomics<-rbind(dc[,-12],marvel[,-12])
-
-#FALTA CREAR VARIABLE PARA LA DECADA
-floor_decade    = function(value){ return(value - value %% 10) }
-allcomics$YEAR.APARICION <- allcomics$YEAR 
-allcomics$YEAR.APARICION <- as.numeric(allcomics$YEAR.APARICION)
-
-#which(is.na(allcomics$YEAR.APARICION))
-allcomics$YEAR.APARICION[is.na(allcomics$YEAR.APARICION)] <- 0
-allcomics$YEAR.APARICION[allcomics$YEAR.APARICION==''] <- 0
-
-#CANTIDAD DE PERSONAJES SIN AñO DE APARICION 
-length(which(allcomics$YEAR.APARICION==0))
-
-allcomics$DECADA.APARICION <- floor_decade(allcomics$YEAR.APARICION)
-
-#ESCRITURA A DISCO
-write.csv(allcomics, file = 'allcomics-wikia-data.csv', row.names=FALSE)
-
-#LECTURA DE NUEVO DATASET FULL
-fulldata <- read.csv("allcomics-wikia-data.csv")
-fulldata$name <- as.character(fulldata$name)
-fulldata$urlslug <- as.character(fulldata$urlslug)
-fulldata$HAIR <- as.numeric(fulldata$HAIR)
-
-#ASIGNACION DE NA A VALORES NULOS
-fulldata$TRIMESTRE.APARICION[fulldata$TRIMESTRE.APARICION==0] <- NA
-fulldata$YEAR.APARICION[fulldata$YEAR.APARICION==0] <- NA
-fulldata$DECADA.APARICION[fulldata$DECADA.APARICION==0] <- NA
-
-str(fulldata)
-view(fulldata)
-
-#cov(fulldata[,1,16])
-
-#cor2(fulldata)
-
-#cor(fulldata$APPEARANCES, fulldata$ID, use = 'complete.obs', method="spearman")
-#cor(fulldata$ALIGN, fulldata$ID, use = 'complete.obs', method="spearman")
+#################################################################
+###################FIN DE JOIN DE DATASETS ######################
+#################################################################
 
 
-hist(fulldata$HAIR)
+#################################################################
+#########INICIO DE HOMOGENIZACION DE FACTORES ###################
+#################################################################
 
-#cor(fulldata$APPEARANCES, fulldata$name, use = 'complete.obs', method="spearman")
-plot(fulldata$BRAND,fulldata$APPEARANCES)
-hist(fulldata$BRAND)
-
-
-cor(fulldata$APPEARANCES, fulldata$TRIMESTRE.APARICION, use = 'complete.obs', method="spearman")
-plot(fulldata$TRIMESTRE.APARICION, fulldata$APPEARANCES)
-hist(fulldata$TRIMESTRE.APARICION)
-
-
-cor(fulldata$APPEARANCES, fulldata$YEAR.APARICION, use = 'complete.obs', method="spearman")
-plot(fulldata$YEAR.APARICION, fulldata$APPEARANCES)
-hist(fulldata$YEAR.APARICION)
-
-cor(fulldata$APPEARANCES, fulldata$DECADA.APARICION, use = 'complete.obs', method="spearman")
-plot(fulldata$DECADA.APARICION, fulldata$APPEARANCES)
-hist(fulldata$DECADA.APARICION)
-
-cov(fulldata$APPEARANCES, fulldata$TRIMESTRE.APARICION, use = 'complete.obs')
-cov(fulldata$APPEARANCES, fulldata$YEAR.APARICION, use = 'complete.obs')
-cov(fulldata$APPEARANCES, fulldata$DECADA.APARICION, use = 'complete.obs')
+allcomics$BRAND<-factor(allcomics$BRAND)
+levels(allcomics$BRAND)
+levels(allcomics$ID)
+levels(allcomics$ALIGN)
+levels(allcomics$EYE)
+levels(allcomics$HAIR)
+levels(allcomics$GSM)
+allcomics$GSM <- as.character(allcomics$GSM) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+allcomics$GSM[allcomics$GSM=='Transvestites'] <- 'Transvestites Characters' 
+allcomics$GSM <- factor (allcomics$GSM) #RECONVERSION A FACTOR
 
 
 
-fulldata$YEAR.APARICION <- as.factor(fulldata$YEAR.APARICION)
-fulldata$DECADA.APARICION <- as.factor(fulldata$DECADA.APARICION)
+#################################################################
+############FIN DE HOMOGENIZACION DE FACTORES ###################
+#################################################################
+
+
+#################################################################
+#############INICIO CORRELACION DE VARIABLES#####################
+#################################################################
+
+
+allcomicscorrelation<-allcomics
+allcomicscorrelation[ ,c('page_id', 'urlslug','EYE','HAIR')] <- list(NULL)
+summary(allcomicscorrelation)
+
+str(allcomicscorrelation)
+allcomicscorrelation$MES.APARICION <- as.numeric(allcomicscorrelation$MES.APARICION)
+allcomicscorrelation$MES.APARICION <- as.numeric(allcomicscorrelation$MES.APARICION)
+
+dccorrelationmatrix<-cor2(dccorrelation)
+
+allcomicscorrelation$name<-factor(allcomicscorrelation$name)
+allcomicscorrelation$YEAR <- factor(allcomicscorrelation$YEAR)
+
+allcomicscorrelation$TRIMESTRE.APARICION <- factor(allcomicscorrelation$TRIMESTRE.APARICION)
+allcomicscorrelation$DECADA.APARICION <- factor(allcomicscorrelation$DECADA.APARICION)
+
+allcomicscorrelation$ID<-as.numeric(allcomicscorrelation$ID)
+allcomicscorrelation$ALIGN<-as.numeric(allcomicscorrelation$ALIG)
+allcomicscorrelation$SEX<-as.numeric(allcomicscorrelation$SEX)
+allcomicscorrelation$GSM<-as.numeric(allcomicscorrelation$GSM)
+allcomicscorrelation$ALIVE<-as.numeric(allcomicscorrelation$ALIVE)
+allcomicscorrelation$YEAR<-as.numeric(allcomicscorrelation$YEAR)
+allcomicscorrelation$MES.APARICION<-as.numeric(allcomicscorrelation$MES.APARICION)
+allcomicscorrelation$TRIMESTRE.APARICION<-as.numeric(allcomicscorrelation$TRIMESTRE.APARICION)
+allcomicscorrelation$BRAND<-as.numeric(allcomicscorrelation$BRAND)
+str(allcomicscorrelation)
+view(allcomicscorrelation)
+
+cor(allcomicscorrelation)
+
+#################################################################
+################FIN CORRELACION DE VARIABLES#####################
+#################################################################
+
+```
+
+
+## Analisis Exploratorio
+
+Creacion de un dataset con los personajes de ambas marcas, y la respectiva homogenizacion de las categorias.
+
+```{r histogramas}
+
+#GSMCOUNTS <- allcomics %>%
+#  group_by(GSM) %>%
+#  summarise(counts = n())
+#GSMCOUNTS
+
+#https://rpubs.com/cardiomoon/329677
+#http://www.sthda.com/english/articles/32-r-graphics-essentials/132-plot-grouped-data-box-plot-bar-plot-and-more/
+
+ggplot(allcomics,aes(x=factor(GSM),fill=factor(BRAND)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+  coord_flip()+
+   labs(title = 'Cantidad de Géneros por Marca de COMIC') 
+
+
+ggplot(allcomics,aes(x=factor(SEX),fill=factor(BRAND)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=scales::percent(..count../sum(..count..))),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'PROPORCION DEL SEXO SEGUN LA MARCA DENTRO DEL DATASET') 
+
+ggplot(allcomics,aes(x=factor(SEX),fill=factor(DECADA.APARICION)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'EVOLUCION DEL SEXO DE PERSONAJES A TRAVES DEL TIEMPO') 
+
+
+ggplot(allcomics,aes(x=factor(DECADA.APARICION),fill=factor(ALIGN)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'EVOLUCION DEL BANDO DE LOS PERSONAJES A TRAVES DEL TIEMPO') 
+
+
+ggplot(allcomics,aes(x=factor(BRAND),fill=factor(ALIGN)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'EVOLUCION DEL BANDO DE LOS PERSONAJES SEGUN LA MARCA DEL COMIC')
+
+ggplot(allcomics,aes(x=factor(BRAND),fill=factor(EYE)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'EVOLUCION DEL BANDO DE LOS PERSONAJES SEGUN LA MARCA DEL COMIC') 
 
 
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r graficos, echo=FALSE}
-plot(pressure)
-```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

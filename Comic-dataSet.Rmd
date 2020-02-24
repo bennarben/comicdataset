@@ -36,6 +36,11 @@ Creamos dos funciones para uso posterior en el dataset, una para la matrix de co
 ################################################################
 #FUNCION PARA CALCULO DE DECADA
 floor_decade    = function(value){ return(value - value %% 10) }
+mi_moda<-function(var){
+  frec.var<-table(var)
+  valor<-which(frec.var==max(frec.var)) # Elementos con el valor máximo
+  names(valor)
+}
 ################################################################
 
 ```
@@ -179,6 +184,7 @@ dc[3194, 'SEX'] <- 'Male Characters'
 dc[3355, 'SEX'] <- 'Male Characters'
 
 #CONTRASTAMOS LA PREDOMINACION MASCULINA, POR LO QUE SE OPTA POR REEMPLAZAR EL VALOR POR LA MODA.
+mi_moda(dc$SEX)
 dc$SEX[dc$SEX==''] <- 'Male Characters' 
 
 #DETECTAMOS "TRANSGENDER" Y "GENDERLESS" COMO SEXO
@@ -250,6 +256,11 @@ dc[6855, 'ALIVE'] <- 'Living Characters'
 dc$ALIVE <- factor (dc$ALIVE) #RECONVERSION A FACTOR
 
 
+#CORRECCION DE CARACTERISTICAS FISICAS: EYE, HAIR
+which(dc$EYE=='Auburn Hair')
+view(which(dc$EYE=='Auburn Hair'))
+dc$HAIR[dc$EYE=='Auburn Hair'] <- 'Auburn Hair' 
+dc$EYE[dc$EYE=='Auburn Hair'] <- 'NOT SPECIFIED'
 
 #PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS SEGUN EL PROMEDIO DE LA VARIABLE
 dc$APPEARANCES[is.na(dc$APPEARANCES)]<-ceiling(mean(dc$APPEARANCES,na.rm=TRUE))
@@ -429,7 +440,7 @@ marvel$HAIR[marvel$HAIR==''] <- 'NOT SPECIFIED'
 marvel$HAIR <- factor (marvel$HAIR) #RECONVERSION A FACTOR
 
 #PARA SEX FALTANTES: POR LO QUE SE OPTA POR REEMPLAZAR EL VALOR POR LA MODA.
-length(which(marvel$SEX==''))
+mi_moda(marvel$SEX)
 marvel$SEX[marvel$SEX==''] <- 'Male Characters' 
 
 #DETECTAMOS "AGENDER" Y "GENDERFLUID" COMO SEXO
@@ -652,6 +663,13 @@ Creacion de un dataset con los personajes de ambas marcas, y la respectiva homog
 #https://rpubs.com/cardiomoon/329677
 #http://www.sthda.com/english/articles/32-r-graphics-essentials/132-plot-grouped-data-box-plot-bar-plot-and-more/
 
+
+par(mfrow=c(2,2))
+interaction.plot(allcomics$BRAND,allcomics$SEX,allcomics$APPEARANCES, main ="Apariciones Segun Sexo vs Marca")
+interaction.plot(allcomics$BRAND,allcomics$ALIGN,allcomics$APPEARANCES, main ="Apariciones Segun Bando vs Marca")
+interaction.plot(allcomics$BRAND,allcomics$ALIVE,allcomics$APPEARANCES, main ="Apariciones Segun Estado vs Marca")
+interaction.plot(allcomics$BRAND,allcomics$ID,allcomics$APPEARANCES, main ="Apariciones Segun Identidad vs Marca")
+
 ggplot(allcomics,aes(x=factor(GSM),fill=factor(BRAND)))+
     geom_bar(position="dodge")+
     geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
@@ -713,13 +731,51 @@ ggplot(allcomics)+
   geom_point()+
     geom_smooth(method = 'lm', color = 'red3', fill = 'red3')
 
-
 ggplot(allcomics)+
   aes(x=TIEMPO.APARICION,y=APPEARANCES,colour=SEX)+
   geom_point()+
     facet_grid(~BRAND)+
   geom_smooth(method = 'lm', color = 'red3', fill = 'red3')
 
+
+# PROMEDIO DE APARICIONES SEGUN GENERO
+ggplot(allcomics,  aes(x = fct_infreq(GSM),  y=APPEARANCES, fill = GSM)) + 
+   stat_summary_bin(fun.y = mean, geom = "bar") + 
+ #  scale_fill_grey() + 
+   coord_flip() +
+   theme_classic() +
+   theme(legend.position = 'top') +    
+   labs(title = 'Promedio de Apariciones Segun el Genero') 
+
+# PROMEDIO DE APARICIONES SEGUN SEXO
+ggplot(allcomics,  aes(x = fct_infreq(SEX),  y=APPEARANCES, fill = SEX)) + 
+   stat_summary_bin(fun.y = mean, geom = "bar") + 
+ #  scale_fill_grey() + 
+   coord_flip() +
+   theme_classic() +
+   theme(legend.position = 'top') +  
+   labs(title = 'Promedio de Apariciones Segun el Sexo')+
+    facet_grid(~BRAND)
+
+
+# PROMEDIO DE APARICIONES SEGUN SEXO
+ggplot(allcomics,  aes(x = DECADA.APARICION,  y=APPEARANCES, fill = SEX)) + 
+   stat_summary_bin(fun.y = mean, geom = "bar") + 
+ #  scale_fill_grey() + 
+   theme_classic() +
+   theme(legend.position = 'top') +  
+   labs(title = 'Promedio de Aparicion segun la decada de Aparicion y el sexo del personaje')+
+    facet_grid(~BRAND)
+
+# PROMEDIO DE APARICIONES SEGUN HAIR
+ggplot(allcomics,  aes(x = fct_infreq(EYE),  y=APPEARANCES, fill = HAIR)) + 
+   stat_summary_bin(fun.y = mean, geom = "bar") + 
+ #  scale_fill_grey() + 
+   coord_flip() +
+   theme_classic() +
+   theme(legend.position = 'right') +  
+   labs(title = 'Promedio de Apariciones Segun caracteristicas fisicas') +
+    facet_grid(~BRAND)
 
 ```
 

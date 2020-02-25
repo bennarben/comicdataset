@@ -622,7 +622,8 @@ allcomicscorrelation$MES.APARICION <- as.numeric(allcomicscorrelation$MES.APARIC
 
 dccorrelationmatrix<-cor2(dccorrelation)
 
-allcomicscorrelation$name<-factor(allcomicscorrelation$name)
+allcomicscorrelation$name<-as.character(allcomicscorrelation$name)
+allcomicscorrelation$name_length<-nchar(allcomicscorrelation$name)
 allcomicscorrelation$YEAR <- factor(allcomicscorrelation$YEAR)
 
 allcomicscorrelation$TRIMESTRE.APARICION <- factor(allcomicscorrelation$TRIMESTRE.APARICION)
@@ -637,10 +638,12 @@ allcomicscorrelation$YEAR<-as.numeric(allcomicscorrelation$YEAR)
 allcomicscorrelation$MES.APARICION<-as.numeric(allcomicscorrelation$MES.APARICION)
 allcomicscorrelation$TRIMESTRE.APARICION<-as.numeric(allcomicscorrelation$TRIMESTRE.APARICION)
 allcomicscorrelation$BRAND<-as.numeric(allcomicscorrelation$BRAND)
+allcomicscorrelation$DECADA.APARICION<-as.numeric(allcomicscorrelation$DECADA.APARICION)
+
 str(allcomicscorrelation)
 view(allcomicscorrelation)
 
-#cor(allcomicscorrelation)
+cor(allcomicscorrelation[,-which(names(allcomicscorrelation) == "name")])
 
 #################################################################
 ################FIN CORRELACION DE VARIABLES#####################
@@ -776,6 +779,12 @@ ggplot(allcomics,  aes(x = fct_infreq(EYE),  y=APPEARANCES, fill = HAIR)) +
    theme(legend.position = 'right') +  
    labs(title = 'Promedio de Apariciones Segun caracteristicas fisicas') +
     facet_grid(~BRAND)
+
+ggplot(allcomics,aes(x=factor(SEX),fill=factor(ALIGN)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'BANDO DE LOS PERSONAJES SEGUN EL SEXO')
+
 
 ```
 

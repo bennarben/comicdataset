@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #librerias base
 library(tidyverse)
+library (caTools)
 library(readr)
 library(lubridate)
 library(eeptools)
@@ -25,6 +26,8 @@ library(corrplot) # Correlation visualizations
 library(gridExtra) # Grids for visualizations
 library(magrittr) # needs to be run every time you start R and want to use %>%
 library(dplyr)    # alternatively, this also loads %>%
+library(randomForest) # Classification algorithm
+library(VIM)
 theme_set(theme_pubr())
 ```
 ## DEFINICION DE FUNCIONES AUXILIARES
@@ -257,10 +260,17 @@ dc$ALIVE <- factor (dc$ALIVE) #RECONVERSION A FACTOR
 
 
 #CORRECCION DE CARACTERISTICAS FISICAS: EYE, HAIR
+levels(dc$EYE)
 which(dc$EYE=='Auburn Hair')
 view(which(dc$EYE=='Auburn Hair'))
+dc$HAIR<-as.character(dc$HAIR)
+dc$EYE<-as.character(dc$EYE)
 dc$HAIR[dc$EYE=='Auburn Hair'] <- 'Auburn Hair' 
 dc$EYE[dc$EYE=='Auburn Hair'] <- 'NOT SPECIFIED'
+dc$HAIR<-factor(dc$HAIR)
+dc$EYE<-factor(dc$EYE)
+view(dc)
+
 
 #PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS SEGUN EL PROMEDIO DE LA VARIABLE
 dc$APPEARANCES[is.na(dc$APPEARANCES)]<-ceiling(mean(dc$APPEARANCES,na.rm=TRUE))
@@ -270,6 +280,8 @@ dc<-subset(dc, !is.na(dc$FIRST.APPEARANCE) | dc$FIRST.APPEARANCE=='')
 
 #PARA YEAR: ELIMINACION DE OBSERVACIONES
 dc<-subset(dc, !is.na(dc$YEAR))
+
+which(is.na(dc))
 
 
 #################################################################
@@ -307,6 +319,8 @@ dc$TRIMESTRE.APARICION<- ymd(dc$FECHA.APARICION) %>%
 dc$DECADA.APARICION <- floor_decade(dc$YEAR)
 
 summary(dc)
+which(is.na(dc))
+
 
 #################################################################
 ################FIN CREACION DE VARIABLES########################
@@ -318,11 +332,13 @@ summary(dc)
 
 
 dccorrelation<-dc
-dccorrelation[ ,c('page_id','name', 'urlslug','EYE','HAIR')] <- list(NULL)
+dccorrelation[ ,c('name', 'urlslug')] <- list(NULL)
 summary(dccorrelation)
 
 dccorrelation$ID<-as.numeric(dccorrelation$ID)
-dccorrelation$ALIGN<-as.numeric(dccorrelation$ALIG)
+dccorrelation$ALIGN<-as.numeric(dccorrelation$HAIR)
+dccorrelation$HAIR<-as.numeric(dccorrelation$EYE)
+dccorrelation$EYE<-as.numeric(dccorrelation$ID)
 dccorrelation$SEX<-as.numeric(dccorrelation$SEX)
 dccorrelation$GSM<-as.numeric(dccorrelation$GSM)
 dccorrelation$ALIVE<-as.numeric(dccorrelation$ALIVE)
@@ -330,8 +346,6 @@ dccorrelation$FECHA.APARICION<-as.numeric((dccorrelation$FECHA.APARICION))
 dccorrelation$YEAR<-as.numeric(dccorrelation$YEAR)
 dccorrelation$MES.APARICION<-as.numeric(dccorrelation$MES.APARICION)
 dccorrelation$TRIMESTRE.APARICION<-as.numeric(dccorrelation$TRIMESTRE.APARICION)
-str(dccorrelation)
-view(dccorrelation)
 
 cor(dccorrelation)
 
@@ -478,6 +492,9 @@ marvel<-subset(marvel, !is.na(marvel$FIRST.APPEARANCE) | marvel$FIRST.APPEARANCE
 #PARA YEAR: ELIMINACION DE OBSERVACIONES
 marvel<-subset(marvel, !is.na(marvel$YEAR))
 
+which(is.na(marvel))
+
+
 #################################################################
 ################FIN TRATAMIENTO DE VALORES VACIOS################
 #################################################################
@@ -526,20 +543,20 @@ view(marvel)
 
 
 marvelcorrelation<-marvel
-marvelcorrelation[ ,c('page_id','name', 'urlslug','EYE','HAIR')] <- list(NULL)
+marvelcorrelation[ ,c('name', 'urlslug')] <- list(NULL)
 summary(marvelcorrelation)
 
 marvelcorrelation$ID<-as.numeric(marvelcorrelation$ID)
 marvelcorrelation$ALIGN<-as.numeric(marvelcorrelation$ALIG)
 marvelcorrelation$SEX<-as.numeric(marvelcorrelation$SEX)
 marvelcorrelation$GSM<-as.numeric(marvelcorrelation$GSM)
+marvelcorrelation$HAIR<-as.numeric(marvelcorrelation$HAIR)
+marvelcorrelation$EYE<-as.numeric(marvelcorrelation$EYE)
 marvelcorrelation$ALIVE<-as.numeric(marvelcorrelation$ALIVE)
 marvelcorrelation$FECHA.APARICION<-as.numeric((marvelcorrelation$FECHA.APARICION))
 marvelcorrelation$YEAR<-as.numeric(marvelcorrelation$YEAR)
 marvelcorrelation$MES.APARICION<-as.numeric(marvelcorrelation$MES.APARICION)
 marvelcorrelation$TRIMESTRE.APARICION<-as.numeric(marvelcorrelation$TRIMESTRE.APARICION)
-str(marvelcorrelation)
-view(marvelcorrelation)
 
 cor(marvelcorrelation)
 
@@ -569,6 +586,11 @@ marvel$BRAND<-'MARVEL'
 #JOIN DE DATAFRAMES MARVEL Y DC
 allcomics<-rbind(dc,marvel)
 
+which(is.na(dc))
+which(is.na(marvel))
+which(is.na(allcomics))
+
+
 #ALEATORIEDAD DE OBSERVACIONES
 allcomics <- allcomics[sample(nrow(allcomics)),]
 
@@ -578,7 +600,7 @@ summary(allcomics)
 summary(dc)
 summary(marvel)
 
-allcomics[ ,c('FECHA.APARICION')] <- list(NULL)
+#allcomics[ ,c('FECHA.APARICION')] <- list(NULL)
 
 #################################################################
 ###################FIN DE JOIN DE DATASETS ######################
@@ -600,6 +622,7 @@ allcomics$GSM <- as.character(allcomics$GSM) #ELIMINACION DE FACTOR PARA PODER E
 allcomics$GSM[allcomics$GSM=='Transvestites'] <- 'Transvestites Characters' 
 allcomics$GSM <- factor (allcomics$GSM) #RECONVERSION A FACTOR
 
+which(is.na(allcomics))
 
 
 #################################################################
@@ -613,37 +636,43 @@ allcomics$GSM <- factor (allcomics$GSM) #RECONVERSION A FACTOR
 
 
 allcomicscorrelation<-allcomics
-allcomicscorrelation[ ,c('page_id', 'urlslug','EYE','HAIR')] <- list(NULL)
+#allcomicscorrelation[ ,c('urlslug')] <- list(NULL)
+
 summary(allcomicscorrelation)
 
 str(allcomicscorrelation)
 allcomicscorrelation$MES.APARICION <- as.numeric(allcomicscorrelation$MES.APARICION)
 allcomicscorrelation$MES.APARICION <- as.numeric(allcomicscorrelation$MES.APARICION)
 
-dccorrelationmatrix<-cor2(dccorrelation)
 
-allcomicscorrelation$name<-as.character(allcomicscorrelation$name)
-allcomicscorrelation$name_length<-nchar(allcomicscorrelation$name)
+allcomicscorrelation$name<-factor(allcomicscorrelation$name)
+allcomicscorrelation$urlslug<-factor(allcomicscorrelation$urlslug)
+allcomicscorrelation$BRAND<-factor(allcomicscorrelation$BRAND)
 allcomicscorrelation$YEAR <- factor(allcomicscorrelation$YEAR)
 
 allcomicscorrelation$TRIMESTRE.APARICION <- factor(allcomicscorrelation$TRIMESTRE.APARICION)
 allcomicscorrelation$DECADA.APARICION <- factor(allcomicscorrelation$DECADA.APARICION)
 
+allcomicscorrelation$name<-as.numeric(allcomicscorrelation$name)
+allcomicscorrelation$urlslug<-as.numeric(allcomicscorrelation$urlslug)
 allcomicscorrelation$ID<-as.numeric(allcomicscorrelation$ID)
 allcomicscorrelation$ALIGN<-as.numeric(allcomicscorrelation$ALIG)
 allcomicscorrelation$SEX<-as.numeric(allcomicscorrelation$SEX)
+allcomicscorrelation$EYE<-as.numeric(allcomicscorrelation$EYE)
+allcomicscorrelation$HAIR<-as.numeric(allcomicscorrelation$HAIR)
 allcomicscorrelation$GSM<-as.numeric(allcomicscorrelation$GSM)
 allcomicscorrelation$ALIVE<-as.numeric(allcomicscorrelation$ALIVE)
+allcomicscorrelation$FECHA.APARICION<-as.numeric(allcomicscorrelation$FECHA.APARICION)
 allcomicscorrelation$YEAR<-as.numeric(allcomicscorrelation$YEAR)
 allcomicscorrelation$MES.APARICION<-as.numeric(allcomicscorrelation$MES.APARICION)
 allcomicscorrelation$TRIMESTRE.APARICION<-as.numeric(allcomicscorrelation$TRIMESTRE.APARICION)
-allcomicscorrelation$BRAND<-as.numeric(allcomicscorrelation$BRAND)
 allcomicscorrelation$DECADA.APARICION<-as.numeric(allcomicscorrelation$DECADA.APARICION)
-
+allcomicscorrelation$BRAND<-as.numeric(allcomicscorrelation$BRAND)
 str(allcomicscorrelation)
 view(allcomicscorrelation)
 
-cor(allcomicscorrelation[,-which(names(allcomicscorrelation) == "name")])
+cor(allcomicscorrelation)
+which(is.na(allcomics))
 
 #################################################################
 ################FIN CORRELACION DE VARIABLES#####################
@@ -667,38 +696,74 @@ Creacion de un dataset con los personajes de ambas marcas, y la respectiva homog
 #http://www.sthda.com/english/articles/32-r-graphics-essentials/132-plot-grouped-data-box-plot-bar-plot-and-more/
 
 
+topcomics<-allcomics %>%
+   arrange(desc(APPEARANCES)) %>%
+   head(10)
+
+oldestcomics<-allcomics %>%
+   arrange(YEAR) %>%
+   head(10)
+
+view(allcomics)
+
+ggplot(topcomics, aes(x=reorder(name, -APPEARANCES), y=APPEARANCES,fill=BRAND,label=APPEARANCES)) + 
+  geom_bar(stat = "identity") +
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+    geom_text(size = 3, position = position_stack(vjust = 0.5))+
+     labs(title = 'Los 10 Personajes con Mayores Apariciones divididos por Marca') 
+
+ ggplot(oldestcomics, aes(x=reorder(name, FECHA.APARICION), y=factor(YEAR),fill=BRAND,label=FECHA.APARICION)) + 
+  geom_bar(stat = "identity") +
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+     geom_text(size = 3, angle = 45, position = position_stack(vjust = 0.5))+
+     labs(title = 'Los 10 Personajes con más antiguos divididos por Marca') 
+
 par(mfrow=c(2,2))
 interaction.plot(allcomics$BRAND,allcomics$SEX,allcomics$APPEARANCES, main ="Apariciones Segun Sexo vs Marca")
 interaction.plot(allcomics$BRAND,allcomics$ALIGN,allcomics$APPEARANCES, main ="Apariciones Segun Bando vs Marca")
 interaction.plot(allcomics$BRAND,allcomics$ALIVE,allcomics$APPEARANCES, main ="Apariciones Segun Estado vs Marca")
 interaction.plot(allcomics$BRAND,allcomics$ID,allcomics$APPEARANCES, main ="Apariciones Segun Identidad vs Marca")
 
+
 ggplot(allcomics,aes(x=factor(GSM),fill=factor(BRAND)))+
     geom_bar(position="dodge")+
-    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+    geom_text(aes(label=..count..),stat='count',position = position_stack(vjust = .5))+
   coord_flip()+
-   labs(title = 'Cantidad de Géneros por Marca de COMIC') +
-    facet_grid(~SEX)
-
+   labs(title = 'COMPOSICION DEL DATASET: MARCA VS GENERO') +
+    facet_grid(~BRAND)
 
 ggplot(allcomics,aes(x=factor(SEX),fill=factor(BRAND)))+
     geom_bar(position="dodge")+
     geom_text(aes(label=scales::percent(..count../sum(..count..))),stat='count',position=position_dodge(0.9),vjust=-0.2)+
-   labs(title = 'PROPORCION DEL SEXO SEGUN LA MARCA DENTRO DEL DATASET') 
+   labs(title = 'COMPOSICION DEL DATASET: SEGUN EL SEXO') 
 
 
 ggplot(allcomics,aes(x=factor(SEX),fill=factor(DECADA.APARICION)))+
     geom_bar(position="dodge")+
     geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
    labs(title = 'EVOLUCION DEL SEXO DE PERSONAJES A TRAVES DEL TIEMPO') +
-    facet_grid(~BRAND)
+    facet_grid(~BRAND) 
+
+ggplot(allcomics,aes(x=(FECHA.APARICION),group=SEX,shape=SEX,color=SEX))+
+geom_line(stat = "count")+
+   labs(title = 'EVOLUCION DE LA APARICION DE PERSONAJES SEGUN SEXO') +
+    facet_grid(~BRAND) 
 
 
 ggplot(allcomics,aes(x=factor(DECADA.APARICION),fill=factor(ALIGN)))+
     geom_bar(position="dodge")+
     geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
-   labs(title = 'EVOLUCION DEL BANDO DE LOS PERSONAJES A TRAVES DEL TIEMPO') 
+   labs(title = 'CANTIDAD DE PERSONAJES SEGUN BANDOS POR DECADAS') 
 
+ggplot(allcomics,aes(x=factor(DECADA.APARICION),group=ALIGN,shape=ALIGN,color=ALIGN))+
+geom_line(stat = "count")+
+   labs(title = 'CANTIDAD DE PERSONAJES SEGUN BANDOS POR DECADAS') +
+    theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+    facet_grid(~BRAND) 
 
 ggplot(allcomics,aes(x=factor(BRAND),fill=factor(ALIGN)))+
     geom_bar(position="dodge")+
@@ -706,10 +771,11 @@ ggplot(allcomics,aes(x=factor(BRAND),fill=factor(ALIGN)))+
    labs(title = 'EVOLUCION DEL BANDO DE LOS PERSONAJES SEGUN LA MARCA DEL COMIC') +
     facet_grid(~SEX)
 
-ggplot(allcomics,aes(x=factor(BRAND),fill=factor(EYE)))+
-    geom_bar(position="dodge")+
-    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
-   labs(title = 'EVOLUCION DEL BANDO DE LOS PERSONAJES SEGUN LA MARCA DEL COMIC') 
+ggplot(allcomics)+
+  aes(x=FECHA.APARICION,y=APPEARANCES, colour=BRAND)+
+  geom_point()+
+  geom_smooth(method = 'lm', color = 'red3', fill = 'red3')+   
+  labs(title = 'CANTIDAD DE APARICIONES DEL PERSONAJES SEGUN SU CREACION')
 
 ggplot(allcomics)+
   aes(x=YEAR,y=APPEARANCES, colour=SEX)+
@@ -780,13 +846,80 @@ ggplot(allcomics,  aes(x = fct_infreq(EYE),  y=APPEARANCES, fill = HAIR)) +
    labs(title = 'Promedio de Apariciones Segun caracteristicas fisicas') +
     facet_grid(~BRAND)
 
-ggplot(allcomics,aes(x=factor(SEX),fill=factor(ALIGN)))+
-    geom_bar(position="dodge")+
-    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
-   labs(title = 'BANDO DE LOS PERSONAJES SEGUN EL SEXO')
+
+which(is.na(allcomics))
+
+str(allcomics)
+#allcomics[ ,c('name','urlslug','TIEMPO.APARICION','YEAR','MES.APARICION','ID','DECADA.APARICION','TRIMESTRE.APARICION','ALIVE','BRAND','GSM','SEX')] <- list(NULL)
+allcomics[ ,c('name','urlslug')] <- list(NULL)
+allcomics$FECHA.APARICION<-factor(allcomics$FECHA.APARICION)
+allcomics$FECHA.APARICION<-as.numeric(allcomics$FECHA.APARICION)
+allcomics$BRAND<-factor(allcomics$BRAND)
+
+set.seed(123)   #  set seed to ensure you always have same random numbers generated
+sample = sample.split(allcomics,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
+train =subset(allcomics,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
+test=subset(allcomics, sample==FALSE)
+
+str(train)
+str(test)
+
+summary(train)
+
+test[ ,c('APPEARANCES')] <- list(NULL)
+
+which(is.na(allcomics))
+which(is.na(train))
+
+aggr(train, sortVars = TRUE, prop = FALSE, cex.axis = .35, 
+     numbers = TRUE, col = c('grey99','red'))
+
+aggr(test, sortVars = TRUE, prop = FALSE, cex.axis = .35, 
+     numbers = TRUE, col = c('grey99','red'))
+
+set.seed(222)
+rf_model <- randomForest(APPEARANCES ~ .,
+                         data = train, 
+                         ntree = 501,
+                         replace = TRUE,
+                         nodesize = 9,
+                         importance = TRUE); print(rf_model)
+
+
+
+
+# Create an object for importance of variables
+importance <- importance(rf_model) 
+
+# Create data frame using importance. 
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[,'IncNodePurity'], 0))
+
+rf_model
+# Create interactive plot.
+ggplotly(ggplot(varImportance, aes(x = reorder(Variables, Importance), 
+                           y = Importance, fill = Importance)) +
+       geom_bar(stat='identity') + 
+       labs(title = 'Importancia del predictor', x = 'Predictor', y = 'RMSLE') +
+       coord_flip() + 
+       theme_light())
+
+correlation <-cor(allcomicscorrelation)
+
+corrplot(correlation,method="circle")
 
 
 ```
 
+# Predicción
+
+Ahora que hemos creado nuestro modelo, lo usaremos para clasificar la marca del comic
+
+Ejecución de la predicción con los datos de prueba TEST:
+```{r}
+prediction <- predict(rf_model, test)
+solution <- data.frame(id = test$page_id, BRAND = prediction)
+write.csv(solution, file = 'clasificacion_marca.csv', row.names = F)
+```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

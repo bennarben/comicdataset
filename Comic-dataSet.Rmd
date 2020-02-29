@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #librerias base
 library(tidyverse)
+library(caret)
 library (caTools)
 library(readr)
 library(lubridate)
@@ -27,6 +28,8 @@ library(gridExtra) # Grids for visualizations
 library(magrittr) # needs to be run every time you start R and want to use %>%
 library(dplyr)    # alternatively, this also loads %>%
 library(randomForest) # Classification algorithm
+library(rpart)
+library(rpart.plot)
 library(VIM)
 theme_set(theme_pubr())
 ```
@@ -59,8 +62,7 @@ Cargamos los dataset en dos dataframes DC
 
 getwd()
 dir()
-dcoriginal <- read.csv("dc-wikia-data.csv")
-dc<-dcoriginal
+dc <- read.csv("dc-wikia-data.csv")
 str(dc)
 summary(dc)
 
@@ -68,10 +70,6 @@ summary(dc)
 dc$name <- as.character(dc$name)
 dc$urlslug <- as.character(dc$urlslug)
 dc$FIRST.APPEARANCE <- as.character(dc$FIRST.APPEARANCE)
-
-
-summary(dc)
-str(dc)
 
 length(which(is.na(dc$page_id)))
 length(which(dc$page_id==''))
@@ -262,18 +260,12 @@ dc$ALIVE <- factor (dc$ALIVE) #RECONVERSION A FACTOR
 #CORRECCION DE CARACTERISTICAS FISICAS: EYE, HAIR
 levels(dc$EYE)
 which(dc$EYE=='Auburn Hair')
-view(which(dc$EYE=='Auburn Hair'))
 dc$HAIR<-as.character(dc$HAIR)
 dc$EYE<-as.character(dc$EYE)
 dc$HAIR[dc$EYE=='Auburn Hair'] <- 'Auburn Hair' 
 dc$EYE[dc$EYE=='Auburn Hair'] <- 'NOT SPECIFIED'
 dc$HAIR<-factor(dc$HAIR)
 dc$EYE<-factor(dc$EYE)
-view(dc)
-
-
-#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS SEGUN EL PROMEDIO DE LA VARIABLE
-dc$APPEARANCES[is.na(dc$APPEARANCES)]<-ceiling(mean(dc$APPEARANCES,na.rm=TRUE))
 
 #PARA FIRST.APPEARANCE FALTANTES: ELIMINACION DE OBSERVACIONES
 dc<-subset(dc, !is.na(dc$FIRST.APPEARANCE) | dc$FIRST.APPEARANCE=='')
@@ -281,8 +273,9 @@ dc<-subset(dc, !is.na(dc$FIRST.APPEARANCE) | dc$FIRST.APPEARANCE=='')
 #PARA YEAR: ELIMINACION DE OBSERVACIONES
 dc<-subset(dc, !is.na(dc$YEAR))
 
-which(is.na(dc))
-
+#########QUEDA PENDIENTE RELLENAR LAS APARICIONES FALTANTES,
+#########QUE SE HARA LUEGO DE CREAR VARIABLES, PARA GENERAR
+#########UN MODELO DE REGRESION LINEAL
 
 #################################################################
 ################FIN TRATAMIENTO DE VALORES VACIOS################
@@ -292,6 +285,12 @@ which(is.na(dc))
 #################################################################
 ################INICIO CREACION DE VARIABLES#####################
 #################################################################
+
+#AGREGA COLuMNA NAME LENGTH
+dc$NAME.LENGTH<-nchar(dc$name, type = "chars", allowNA = FALSE, keepNA = NA)
+
+#AGREGA COLuMNA URLLENGTH LENGTH
+dc$URL.LENGTH<-nchar(dc$urlslug, type = "chars", allowNA = FALSE, keepNA = NA)
 
 #AGREGA COLUMNA CON EL PARSEO DE FECHA DE APARICION DE STRING A DATE
 dc$FECHA.APARICION<-parse_date_time(dc$FIRST.APPEARANCE, orders = c("Yb"))
@@ -305,7 +304,7 @@ dc<-subset(dc, !is.na(dc$FECHA.APARICION))
 dc[ ,c('FIRST.APPEARANCE')] <- list(NULL)
 
 #AGREGA COLUMNA CON LOS AñOS DESDE LA APARICION DEL PERSONAJE
-dc$TIEMPO.APARICION<-floor(age_calc(dc$FECHA.APARICION, enddate = Sys.Date(), units = "years", precise = TRUE))
+dc$ANIOS.DESDE.APARICION<-floor(age_calc(dc$FECHA.APARICION, enddate = Sys.Date(), units = "years", precise = TRUE))
 
 #AGREGA COLUMNA CON EL PARSEO MES DE APARICION
 dc$MES.APARICION <- ymd(dc$FECHA.APARICION) %>% 
@@ -318,13 +317,33 @@ dc$TRIMESTRE.APARICION<- ymd(dc$FECHA.APARICION) %>%
 #AGREGA COLUMNA CON LA DECADA DE APARICION
 dc$DECADA.APARICION <- floor_decade(dc$YEAR)
 
-summary(dc)
-which(is.na(dc))
-
-
 #################################################################
 ################FIN CREACION DE VARIABLES########################
 #################################################################
+
+#################################################################
+######MODELO DE REGRESION PARA APARICIONES FALTANTES#############
+#################################################################
+
+#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS CON UN MODELO DE REGRESION LINEAL
+modelo <- lm(dc$APPEARANCES~dc$page_id + dc$NAME.LENGTH + + dc$URL.LENGTH + dc$ID + dc$ALIGN + dc$EYE + dc$HAIR+ dc$SEX+ dc$GSM+ dc$ALIVE+ dc$YEAR+ dc$FECHA.APARICION,
+             data=dc,na.action=na.exclude)
+summary(modelo)
+dc$APPEARANCES[is.na(dc$APPEARANCES)] <- predict(modelo)
+dc$APPEARANCES<-ceiling(dc$APPEARANCES)
+
+#AGREGA COLUMNA CON LAS APARICIONES MEDIAS POR AÑO
+dc$MEDIA.APARICIONES.ANIO<-(dc$APPEARANCES/dc$ANIOS.DESDE.APARICION)
+
+which(is.na(dc))
+summary(dc)
+str(dc)
+view(dc)
+
+#################################################################
+######MODELO DE REGRESION PARA APARICIONES FALTANTES#############
+#################################################################
+
 
 #################################################################
 #############INICIO CORRELACION DE VARIABLES#####################
@@ -348,6 +367,7 @@ dccorrelation$MES.APARICION<-as.numeric(dccorrelation$MES.APARICION)
 dccorrelation$TRIMESTRE.APARICION<-as.numeric(dccorrelation$TRIMESTRE.APARICION)
 
 cor(dccorrelation)
+corrplot(cor(dccorrelation),method ="circle")
 
 #################################################################
 ################FIN CORRELACION DE VARIABLES#####################
@@ -366,15 +386,11 @@ CARGA DEL DATASET DE MARVEL COMICS
 #################################################################
 ###########INICIO LECTURA Y DETECCION DE DATOS VACIOS############
 #################################################################
-marveloriginal <- read.csv("marvel-wikia-data.csv")
-str(marveloriginal)
-summary(marveloriginal)
-#HOMOGENIZACION DE NOMBRES DE VARIABLES
-names(marveloriginal) <- names(dcoriginal) 
-
+marvel <- read.csv("marvel-wikia-data.csv")
+str(marvel)
+summary(marvel)
 
 #TRATAMIENTO DE COLUMNAS TIPO STRING
-marvel<-marveloriginal
 marvel$name <- as.character(marvel$name)
 marvel$urlslug <- as.character(marvel$urlslug)
 marvel$FIRST.APPEARANCE <- as.character(marvel$FIRST.APPEARANCE)
@@ -418,8 +434,8 @@ length(which(marvel$APPEARANCES==''))
 length(which(is.na(marvel$FIRST.APPEARANCE)))
 length(which(marvel$FIRST.APPEARANCE==''))
 
-length(which(is.na(marvel$YEAR)))
-length(which(marvel$YEAR==''))
+length(which(is.na(marvel$Year)))
+length(which(marvel$Year==''))
 
 
 #################################################################
@@ -482,17 +498,16 @@ marvel$ALIVE <- as.character(marvel$ALIVE) #ELIMINACION DE FACTOR PARA PODER EDI
 marvel$ALIVE[marvel$ALIVE=='']<-'Living Characters'
 marvel$ALIVE <- factor (marvel$ALIVE) #RECONVERSION A FACTOR
 
-#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS SEGUN EL PROMEDIO DE LA VARIABLE
-marvel$APPEARANCES[is.na(marvel$APPEARANCES)]<-ceiling(mean(marvel$APPEARANCES,na.rm=TRUE))
-
-
 #PARA FIRST.APPEARANCE FALTANTES: ELIMINACION DE OBSERVACIONES
 marvel<-subset(marvel, !is.na(marvel$FIRST.APPEARANCE) | marvel$FIRST.APPEARANCE=='')
 
 #PARA YEAR: ELIMINACION DE OBSERVACIONES
-marvel<-subset(marvel, !is.na(marvel$YEAR))
+marvel<-subset(marvel, !is.na(marvel$Year))
 
 which(is.na(marvel))
+
+##############PENDIENTE MODELO DE REGRESION PARA RELLENAR APPEARANCES####
+
 
 
 #################################################################
@@ -504,6 +519,13 @@ which(is.na(marvel))
 ################INICIO CREACION DE VARIABLES#####################
 #################################################################
 
+
+#AGREGA COLuMNA NAME LENGTH
+marvel$NAME.LENGTH<-nchar(marvel$name, type = "chars", allowNA = FALSE, keepNA = NA)
+
+#AGREGA COLuMNA URLLENGTH LENGTH
+marvel$URL.LENGTH<-nchar(marvel$urlslug, type = "chars", allowNA = FALSE, keepNA = NA)
+
 #AGREGA COLUMNA CON EL PARSEO DE FECHA DE APARICION DE STRING A DATE
 marvel$FECHA.APARICION<-parse_date_time2(marvel$FIRST.APPEARANCE,"by", cutoff_2000 = 20)
 marvel$FECHA.APARICION <- as.Date(marvel$FECHA.APARICION)
@@ -514,9 +536,8 @@ which(is.na(marvel$FECHA.APARICION))
 #ELIMINACION DE COLUMNA DE FECHA ORIGINAL SIN PARSEAR
 marvel[ ,c('FIRST.APPEARANCE')] <- list(NULL)
 
-
 #AGREGA COLUMNA CON LOS AñOS DESDE LA APARICION DEL PERSONAJE
-marvel$TIEMPO.APARICION<-floor(age_calc(marvel$FECHA.APARICION, enddate = Sys.Date(), units = "years", precise = TRUE))
+marvel$ANIOS.DESDE.APARICION<-floor(age_calc(marvel$FECHA.APARICION, enddate = Sys.Date(), units = "years", precise = TRUE))
 
 #AGREGA COLUMNA CON EL PARSEO MES DE APARICION
 marvel$MES.APARICION <- ymd(marvel$FECHA.APARICION) %>% 
@@ -527,14 +548,35 @@ marvel$TRIMESTRE.APARICION<- ymd(marvel$FECHA.APARICION) %>%
    lubridate::quarter()  # Grab quarter.
 
 #AGREGA COLUMNA CON LA DECADA DE APARICION
-marvel$DECADA.APARICION <- floor_decade(marvel$YEAR)
-
-
+marvel$DECADA.APARICION <- floor_decade(marvel$Year)
 
 view(marvel)
 
 #################################################################
 ################FIN CREACION DE VARIABLES########################
+#################################################################
+
+#################################################################
+######MODELO DE REGRESION PARA APARICIONES FALTANTES#############
+#################################################################
+
+#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS CON UN MODELO DE REGRESION LINEAL
+modelo <- lm(marvel$APPEARANCES~marvel$page_id + marvel$NAME.LENGTH + + marvel$URL.LENGTH + marvel$ID + marvel$ALIGN + marvel$EYE + marvel$HAIR+ marvel$SEX+ marvel$GSM+ marvel$ALIVE+ marvel$Year+ marvel$FECHA.APARICION,
+             data=marvel,na.action=na.exclude)
+summary(modelo)
+marvel$APPEARANCES[is.na(marvel$APPEARANCES)] <- predict(modelo)
+marvel$APPEARANCES[marvel$APPEARANCES<=0] <- 1
+marvel$APPEARANCES<-ceiling(marvel$APPEARANCES)
+#AGREGA COLUMNA CON LAS APARICIONES MEDIAS POR AÑO
+marvel$MEDIA.APARICIONES.ANIO<-(marvel$APPEARANCES/marvel$ANIOS.DESDE.APARICION)
+
+which(is.na(marvel))
+summary(marvel)
+str(marvel)
+view(marvel)
+
+#################################################################
+######MODELO DE REGRESION PARA APARICIONES FALTANTES#############
 #################################################################
 
 #################################################################
@@ -554,18 +596,16 @@ marvelcorrelation$HAIR<-as.numeric(marvelcorrelation$HAIR)
 marvelcorrelation$EYE<-as.numeric(marvelcorrelation$EYE)
 marvelcorrelation$ALIVE<-as.numeric(marvelcorrelation$ALIVE)
 marvelcorrelation$FECHA.APARICION<-as.numeric((marvelcorrelation$FECHA.APARICION))
-marvelcorrelation$YEAR<-as.numeric(marvelcorrelation$YEAR)
+marvelcorrelation$Year<-as.numeric(marvelcorrelation$Year)
 marvelcorrelation$MES.APARICION<-as.numeric(marvelcorrelation$MES.APARICION)
 marvelcorrelation$TRIMESTRE.APARICION<-as.numeric(marvelcorrelation$TRIMESTRE.APARICION)
 
 cor(marvelcorrelation)
+corrplot(cor(marvelcorrelation),method ="circle")
 
 #################################################################
 ################FIN CORRELACION DE VARIABLES#####################
 #################################################################
-
-
-
 
 ```
 
@@ -579,11 +619,13 @@ Creacion de un dataset con los personajes de ambas marcas, y la respectiva homog
 ################INICIO DE JOIN DE DATASETS ######################
 #################################################################
 
-#CREACION DE VARIABLE DE MARCA POR CADA COMIC
-dc$BRAND <-'DC'
-marvel$BRAND<-'MARVEL'
+#HOMOGENIZACION DE NOMBRES DE VARIABLES
+names(marvel) <- names(dc) 
 
 #JOIN DE DATAFRAMES MARVEL Y DC
+dc$BRAND<-'DC'
+marvel$BRAND<-'MARVEL'
+
 allcomics<-rbind(dc,marvel)
 
 which(is.na(dc))
@@ -593,7 +635,6 @@ which(is.na(allcomics))
 
 #ALEATORIEDAD DE OBSERVACIONES
 allcomics <- allcomics[sample(nrow(allcomics)),]
-
 
 str(allcomics)
 summary(allcomics)
@@ -624,7 +665,6 @@ allcomics$GSM <- factor (allcomics$GSM) #RECONVERSION A FACTOR
 
 which(is.na(allcomics))
 
-
 #################################################################
 ############FIN DE HOMOGENIZACION DE FACTORES ###################
 #################################################################
@@ -633,7 +673,6 @@ which(is.na(allcomics))
 #################################################################
 #############INICIO CORRELACION DE VARIABLES#####################
 #################################################################
-
 
 allcomicscorrelation<-allcomics
 #allcomicscorrelation[ ,c('urlslug')] <- list(NULL)
@@ -672,6 +711,8 @@ str(allcomicscorrelation)
 view(allcomicscorrelation)
 
 cor(allcomicscorrelation)
+corrplot(cor(allcomicscorrelation),method = "circle")
+
 which(is.na(allcomics))
 
 #################################################################
@@ -696,6 +737,10 @@ Creacion de un dataset con los personajes de ambas marcas, y la respectiva homog
 #http://www.sthda.com/english/articles/32-r-graphics-essentials/132-plot-grouped-data-box-plot-bar-plot-and-more/
 
 
+topcomicsPerYear<-allcomics %>%
+   arrange(desc(MEDIA.APARICIONES.ANIO)) %>%
+   head(10)
+
 topcomics<-allcomics %>%
    arrange(desc(APPEARANCES)) %>%
    head(10)
@@ -704,15 +749,23 @@ oldestcomics<-allcomics %>%
    arrange(YEAR) %>%
    head(10)
 
-view(allcomics)
-
 ggplot(topcomics, aes(x=reorder(name, -APPEARANCES), y=APPEARANCES,fill=BRAND,label=APPEARANCES)) + 
   geom_bar(stat = "identity") +
    theme_classic() +
    theme(legend.position = 'right')+
   theme(axis.text.x=element_text(angle = -45, hjust = 0))+
     geom_text(size = 3, position = position_stack(vjust = 0.5))+
-     labs(title = 'Los 10 Personajes con Mayores Apariciones divididos por Marca') 
+     labs(title = 'Los 10 Personajes con Mayores Apariciones divididos por Marca')
+
+
+ggplot(topcomicsPerYear, aes(x=reorder(name, -MEDIA.APARICIONES.ANIO), y=MEDIA.APARICIONES.ANIO,fill=BRAND,label=MEDIA.APARICIONES.ANIO)) + 
+  geom_bar(stat = "identity") +
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+    geom_text(size = 3, position = position_stack(vjust = 0.5))+
+     labs(title = 'Los 10 Personajes con más apariciones al año divididos por Marca')
+
 
  ggplot(oldestcomics, aes(x=reorder(name, FECHA.APARICION), y=factor(YEAR),fill=BRAND,label=FECHA.APARICION)) + 
   geom_bar(stat = "identity") +
@@ -801,7 +854,7 @@ ggplot(allcomics)+
     geom_smooth(method = 'lm', color = 'red3', fill = 'red3')
 
 ggplot(allcomics)+
-  aes(x=TIEMPO.APARICION,y=APPEARANCES,colour=SEX)+
+  aes(x=ANIOS.DESDE.APARICION,y=APPEARANCES,colour=SEX)+
   geom_point()+
     facet_grid(~BRAND)+
   geom_smooth(method = 'lm', color = 'red3', fill = 'red3')
@@ -847,35 +900,67 @@ ggplot(allcomics,  aes(x = fct_infreq(EYE),  y=APPEARANCES, fill = HAIR)) +
     facet_grid(~BRAND)
 
 
-which(is.na(allcomics))
 
+
+```
+
+# Predicción de Cantidad de Apariciones, a traves de RANDOM FOREST
+
+Ahora que hemos creado nuestro modelo, lo usaremos para clasificar la marca del comic
+
+Ejecución de la predicción con los datos de prueba TEST:
+```{r}
+
+which(is.na(allcomics))
 str(allcomics)
-#allcomics[ ,c('name','urlslug','TIEMPO.APARICION','YEAR','MES.APARICION','ID','DECADA.APARICION','TRIMESTRE.APARICION','ALIVE','BRAND','GSM','SEX')] <- list(NULL)
-allcomics[ ,c('name','urlslug')] <- list(NULL)
-allcomics$FECHA.APARICION<-factor(allcomics$FECHA.APARICION)
-allcomics$FECHA.APARICION<-as.numeric(allcomics$FECHA.APARICION)
-allcomics$BRAND<-factor(allcomics$BRAND)
+
+allcomics_ML <-allcomics
+allcomics_ML$FECHA.APARICION<-factor(allcomics_ML$FECHA.APARICION)
+allcomics_ML$FECHA.APARICION<-as.numeric(allcomics_ML$FECHA.APARICION)
+allcomics_ML$ID<-as.numeric(allcomics_ML$ID)
+allcomics_ML$ALIGN<-as.numeric(allcomics_ML$ALIGN)
+allcomics_ML$EYE<-as.numeric(allcomics_ML$EYE)
+allcomics_ML$HAIR<-as.numeric(allcomics_ML$HAIR)
+allcomics_ML$SEX<-as.numeric(allcomics_ML$SEX)
+allcomics_ML$GSM<-as.numeric(allcomics_ML$GSM)
+allcomics_ML$ALIVE<-as.numeric(allcomics_ML$ALIVE)
+allcomics_ML$MES.APARICION<-as.numeric(allcomics_ML$MES.APARICION)
+allcomics_ML$BRAND<-as.numeric(allcomics_ML$BRAND)
+
+
+
+allcomics_ML <- mutate(allcomics_ML,
+                       page_id = log10(page_id + 1),
+                       ID = log10(ID + 1),
+                       ALIGN = log10(ALIGN + 1),
+                       EYE = log10(EYE + 1),
+                       HAIR = log10(HAIR + 1),
+                       SEX = log10(SEX + 1),
+                       GSM = log10(GSM + 1),
+                       ALIVE = log10(ALIVE + 1),
+                       APPEARANCES = log10(APPEARANCES + 1),
+                       YEAR = log10(YEAR + 1),
+                       NAME.LENGTH = log10(NAME.LENGTH + 1),
+                       URL.LENGTH = log10(URL.LENGTH + 1),
+                       FECHA.APARICION = log10(FECHA.APARICION + 1),
+                       ANIOS.DESDE.APARICION = log10(ANIOS.DESDE.APARICION + 1),
+                       MES.APARICION = log10(MES.APARICION + 1),
+                       TRIMESTRE.APARICION = log10(TRIMESTRE.APARICION + 1),
+                       DECADA.APARICION = log10(DECADA.APARICION + 1),
+                       BRAND = log10(BRAND + 1))
+
+#REMOCION DE VARIABLES REDUNDANTES Y DE AQUELLAS QUE NO TIENEN RELEVANCIA EN LA PREDICCION DE LAS APARICIENDOS
+allcomics_ML[ ,c('name','urlslug','MEDIA.APARICIONES.ANIO','ANIOS.DESDE.APARICION','MES.APARICION','DECADA.APARICION','YEAR','GSM','ALIVE')] <- list(NULL)
 
 set.seed(123)   #  set seed to ensure you always have same random numbers generated
-sample = sample.split(allcomics,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
-train =subset(allcomics,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
-test=subset(allcomics, sample==FALSE)
-
-str(train)
-str(test)
+sample = sample.split(allcomics_ML,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
+train =subset(allcomics_ML,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
+test=subset(allcomics_ML, sample==FALSE)
 
 summary(train)
 
+test$APARICIONES.ORIGINALES <- test$APPEARANCES
 test[ ,c('APPEARANCES')] <- list(NULL)
-
-which(is.na(allcomics))
-which(is.na(train))
-
-aggr(train, sortVars = TRUE, prop = FALSE, cex.axis = .35, 
-     numbers = TRUE, col = c('grey99','red'))
-
-aggr(test, sortVars = TRUE, prop = FALSE, cex.axis = .35, 
-     numbers = TRUE, col = c('grey99','red'))
 
 set.seed(222)
 rf_model <- randomForest(APPEARANCES ~ .,
@@ -884,10 +969,6 @@ rf_model <- randomForest(APPEARANCES ~ .,
                          replace = TRUE,
                          nodesize = 9,
                          importance = TRUE); print(rf_model)
-
-
-
-
 # Create an object for importance of variables
 importance <- importance(rf_model) 
 
@@ -895,7 +976,6 @@ importance <- importance(rf_model)
 varImportance <- data.frame(Variables = row.names(importance), 
                             Importance = round(importance[,'IncNodePurity'], 0))
 
-rf_model
 # Create interactive plot.
 ggplotly(ggplot(varImportance, aes(x = reorder(Variables, Importance), 
                            y = Importance, fill = Importance)) +
@@ -904,22 +984,117 @@ ggplotly(ggplot(varImportance, aes(x = reorder(Variables, Importance),
        coord_flip() + 
        theme_light())
 
-correlation <-cor(allcomicscorrelation)
-
-corrplot(correlation,method="circle")
-
-
-```
-
-# Predicción
-
-Ahora que hemos creado nuestro modelo, lo usaremos para clasificar la marca del comic
-
-Ejecución de la predicción con los datos de prueba TEST:
-```{r}
 prediction <- predict(rf_model, test)
-solution <- data.frame(id = test$page_id, BRAND = prediction)
-write.csv(solution, file = 'clasificacion_marca.csv', row.names = F)
-```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+solution <- test
+
+solution$APPEARANCES.PREDICTED<-prediction
+
+#se reversa la transformación logaritmica de los ingresos antes de exportar los resultados
+solution <- as_tibble(solution) %>%
+   mutate(page_id=10^page_id,APPEARANCES.PREDICTED = ceiling(10^APPEARANCES.PREDICTED),APARICIONES.ORIGINALES = 10^APARICIONES.ORIGINALES)
+
+solution<-merge(solution, allcomics[, c("page_id", "name")], by="page_id")
+
+
+view(solution)
+
+write.csv(solution, file = 'prediccion_cantidad_apariciones.csv', row.names = F)
+
+```
+# APORTE INDIVIDUAL: Benjamin Naranjo - Predicción de Marca del Comic usando algoritmo DECISION TREE: PRESENCIA WEB(URL.LENTGH), ASPECTO FISICO (EYE, HAIR, SEX)
+```{r}
+#https://www.guru99.com/r-decision-trees.html
+
+allcomics_ML_BN <-allcomics
+allcomics_ML_BN$FECHA.APARICION<-factor(allcomics_ML_BN$FECHA.APARICION)
+allcomics_ML_BN$FECHA.APARICION<-as.numeric(allcomics_ML_BN$FECHA.APARICION)
+
+str(allcomics_ML_BN)
+
+set.seed(123)   #  set seed to ensure you always have same random numbers generated
+sample = sample.split(allcomics_ML_BN,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
+train =subset(allcomics_ML_BN,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
+test=subset(allcomics_ML_BN, sample==FALSE)
+
+test$BRAND.ORIGINAL<-test$BRAND
+test[ ,c('BRAND')] <- list(NULL)
+
+str(train)
+tree_model <- rpart(BRAND~ID+HAIR+EYE+SEX, data = train, method = 'class')
+tree_model
+rpart.plot(tree_model)
+summary(tree_model)
+
+
+solution <-predict(tree_model, test, type = 'class')
+
+matriz_confusion <- table(test$BRAND, solution)
+matriz_confusion
+
+accuracy_Test <- sum(diag(matriz_confusion)) / sum(matriz_confusion)
+print(paste('Accuracy del modelo', accuracy_Test))
+
+```
+# APORTE INDIVIDUAL: Benjamin Naranjo - Predicción de Marca del Comic usando algoritmo DECISION TREE: PRESENCIA WEB(PAGE_ID), CARACTERISTICAS DEL PERSONAJE (ID, HAIR, SEX, YEAR),  
+```{r}
+allcomics_ML_BN <-allcomics
+allcomics_ML_BN$FECHA.APARICION<-factor(allcomics_ML_BN$FECHA.APARICION)
+allcomics_ML_BN$FECHA.APARICION<-as.numeric(allcomics_ML_BN$FECHA.APARICION)
+
+set.seed(123)   #  set seed to ensure you always have same random numbers generated
+sample = sample.split(allcomics_ML_BN,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
+train =subset(allcomics_ML_BN,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
+test=subset(allcomics_ML_BN, sample==FALSE)
+
+test$BRAND.ORIGINAL<-test$BRAND
+test[ ,c('BRAND')] <- list(NULL)
+
+str(train)
+tree_model <- rpart(BRAND~page_id+ID+HAIR+SEX+YEAR, data = train, method = 'class')
+tree_model
+rpart.plot(tree_model)
+summary(tree_model)
+
+
+solution <-predict(tree_model, test, type = 'class')
+
+matriz_confusion <- table(test$BRAND, solution)
+matriz_confusion
+
+accuracy_Test <- sum(diag(matriz_confusion)) / sum(matriz_confusion)
+print(paste('Accuracy del modelo', accuracy_Test))
+```
+# APORTE INDIVIDUAL: Benjamin Naranjo - Predicción de Marca del Comic usando algoritmo DECISION TREE: PRESENCIA WEB(PAGE_ID,URL.LENTGH) y EL TIPO DE IDENTIDAD DEL PERSONAJE (ID)
+```{r}
+
+allcomics_ML_BN <-allcomics
+allcomics_ML_BN$FECHA.APARICION<-factor(allcomics_ML_BN$FECHA.APARICION)
+allcomics_ML_BN$FECHA.APARICION<-as.numeric(allcomics_ML_BN$FECHA.APARICION)
+
+set.seed(123)   #  set seed to ensure you always have same random numbers generated
+sample = sample.split(allcomics_ML_BN,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
+train =subset(allcomics_ML_BN,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
+test=subset(allcomics_ML_BN, sample==FALSE)
+
+test$BRAND.ORIGINAL<-test$BRAND
+test[ ,c('BRAND')] <- list(NULL)
+
+str(train)
+tree_model <- rpart(BRAND~URL.LENGTH+page_id+ID, data = train, method = 'class')
+tree_model
+rpart.plot(tree_model)
+summary(tree_model)
+
+
+solution <-predict(tree_model, test, type = 'class')
+
+matriz_confusion <- table(test$BRAND, solution)
+matriz_confusion
+
+
+accuracy_Test <- sum(diag(matriz_confusion)) / sum(matriz_confusion)
+
+print(paste('Accuracy del modelo', accuracy_Test))
+
+```

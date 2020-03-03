@@ -355,9 +355,9 @@ dccorrelation[ ,c('name', 'urlslug')] <- list(NULL)
 summary(dccorrelation)
 
 dccorrelation$ID<-as.numeric(dccorrelation$ID)
-dccorrelation$ALIGN<-as.numeric(dccorrelation$HAIR)
-dccorrelation$HAIR<-as.numeric(dccorrelation$EYE)
-dccorrelation$EYE<-as.numeric(dccorrelation$ID)
+dccorrelation$ALIGN<-as.numeric(dccorrelation$ALIGN)
+dccorrelation$HAIR<-as.numeric(dccorrelation$HAIR)
+dccorrelation$EYE<-as.numeric(dccorrelation$EYE)
 dccorrelation$SEX<-as.numeric(dccorrelation$SEX)
 dccorrelation$GSM<-as.numeric(dccorrelation$GSM)
 dccorrelation$ALIVE<-as.numeric(dccorrelation$ALIVE)
@@ -589,7 +589,7 @@ marvelcorrelation[ ,c('name', 'urlslug')] <- list(NULL)
 summary(marvelcorrelation)
 
 marvelcorrelation$ID<-as.numeric(marvelcorrelation$ID)
-marvelcorrelation$ALIGN<-as.numeric(marvelcorrelation$ALIG)
+marvelcorrelation$ALIGN<-as.numeric(marvelcorrelation$ALIGN)
 marvelcorrelation$SEX<-as.numeric(marvelcorrelation$SEX)
 marvelcorrelation$GSM<-as.numeric(marvelcorrelation$GSM)
 marvelcorrelation$HAIR<-as.numeric(marvelcorrelation$HAIR)
@@ -695,7 +695,7 @@ allcomicscorrelation$DECADA.APARICION <- factor(allcomicscorrelation$DECADA.APAR
 allcomicscorrelation$name<-as.numeric(allcomicscorrelation$name)
 allcomicscorrelation$urlslug<-as.numeric(allcomicscorrelation$urlslug)
 allcomicscorrelation$ID<-as.numeric(allcomicscorrelation$ID)
-allcomicscorrelation$ALIGN<-as.numeric(allcomicscorrelation$ALIG)
+allcomicscorrelation$ALIGN<-as.numeric(allcomicscorrelation$ALIGN)
 allcomicscorrelation$SEX<-as.numeric(allcomicscorrelation$SEX)
 allcomicscorrelation$EYE<-as.numeric(allcomicscorrelation$EYE)
 allcomicscorrelation$HAIR<-as.numeric(allcomicscorrelation$HAIR)
@@ -900,6 +900,10 @@ ggplot(allcomics,  aes(x = fct_infreq(EYE),  y=APPEARANCES, fill = HAIR)) +
     facet_grid(~BRAND)
 
 
+ggplot(allcomics,aes(x=factor(SEX),fill=factor(ALIGN)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'BANDO DE LOS PERSONAJES SEGUN EL SEXO')
 
 
 ```

@@ -906,6 +906,22 @@ ggplot(allcomics,aes(x=factor(SEX),fill=factor(ALIGN)))+
    labs(title = 'BANDO DE LOS PERSONAJES SEGUN EL SEXO')
 
 
+
+
+
+
+```
+```{r}
+#Nuevas gráficas:
+hist(allcomics$APPEARANCES)
+hist(allcomics$APPEARANCES, breaks = seq(min(allcomics$APPEARANCES),max(allcomics$APPEARANCES), length.out = 11))
+hist(allcomics$APPEARANCES,breaks = c(min(allcomics$APPEARANCES),10,50,100,200,500,1000,2000,3000,max(allcomics$APPEARANCES)))
+hist(allcomics$APPEARANCES[allcomics$APPEARANCES<=100],breaks = c(min(allcomics$APPEARANCES),5,10,20,30,40,50,60,70,80,90,100))
+
+pie(table(allcomics$DECADA.APARICION),main="Apariciones por decada en ambas marcas")
+pie(table(allcomics$DECADA.APARICION[allcomics$BRAND=="MARVEL"]),main = "Apariciones por decada en Marvel")
+pie(table(allcomics$DECADA.APARICION[allcomics$BRAND=="DC"]),main = "Apariciones por decada en DC")
+
 ```
 
 # Predicción de Cantidad de Apariciones, a traves de RANDOM FOREST
@@ -1102,3 +1118,130 @@ accuracy_Test <- sum(diag(matriz_confusion)) / sum(matriz_confusion)
 print(paste('Accuracy del modelo', accuracy_Test))
 
 ```
+
+
+#Aporte individual:Carlos Capitán Agudo-Clasificación de los distintos personajes a partir de técnicas de clustering
+```{r}
+#Primero se realizara una carga de las librerías necesarias:
+library(factoextra)
+library(cluster)
+library(fpc)
+library(NbClust)
+
+#el atributo "brand" va a ser eliminado ya que no va a ser de interes para el clustering 
+#comicsClustering <- data.frame(matrix(unlist(allcomics[,-21]), nrow=length(allcomics), byrow=T))
+#Eliminamos variables que no son importantes para el estudio (como la url o el id):
+comicsClustering<- allcomics[,-c(1,2,3,9,12,15,21)]
+
+#Para realizar el clustering voy a tener que convertir una serie de variables categoricas en numericas:
+
+#Niveles de la identidad (siguiendo unique): 1(Secret Identity),2(No Dual Identity), 3(NOT SPECIFIED), 4(Public Identity), #5(Identity Unknown), 6(Known to Authorities Identity)
+comicsClustering$ID=as.numeric(factor(comicsClustering$ID, levels = unique(comicsClustering$ID)))
+
+#repetimos el mismo proceso para otras variables categoricas como son:Align, eye, hair, sex,alive, y mes.aparicion
+comicsClustering$ALIGN=as.numeric(factor(comicsClustering$ALIGN, levels = unique(comicsClustering$ALIGN)))
+comicsClustering$EYE=as.numeric(factor(comicsClustering$EYE, levels = unique(comicsClustering$EYE)))
+comicsClustering$SEX=as.numeric(factor(comicsClustering$SEX, levels = unique(comicsClustering$SEX)))
+comicsClustering$HAIR=as.numeric(factor(comicsClustering$HAIR, levels = unique(comicsClustering$HAIR)))
+comicsClustering$ALIVE=as.numeric(factor(comicsClustering$ALIVE, levels = unique(comicsClustering$ALIVE)))
+comicsClustering$MES.APARICION=as.numeric(factor(comicsClustering$MES.APARICION, levels = unique(comicsClustering$MES.APARICION)))
+
+
+#comicsClustering$Location<-as.numeric(factor(str_detect(c("Eric Willis (Earth-616)","Nope"),"Earth-616")))
+
+
+
+#Una vez que hemos eliminado ese atributo vamos a comprobar cual es el numero optimo de clusters en nuestros datos:
+res<-NbClust(comicsClustering, diss=NULL, distance = "euclidean", min.nc=2, max.nc=6, 
+            method = "kmeans", index = "dunn") 
+# Valor para cada índice
+res$All.index
+# Número de clusters con mejor índice
+res$Best.nc
+
+
+# Elbow 
+#fviz_nbclust(comicsClustering, pam, method = "wss") +
+    #geom_vline(xintercept = 4, linetype = 2)+
+  #labs(subtitle = "Elbow")
+```
+```{r}
+#realicemos clustering segun kmeans
+#km2.res <- eclust(comicsClustering, "kmeans", k = 2, nstart = 25, graph = FALSE)
+fviz_cluster(km2.res, geom = "point", ellipse.type = "norm",
+             palette = "jco", ggtheme = theme_minimal())
+
+#km.res <- eclust(comicsClustering, "kmeans", k = 3, nstart = 25, graph = FALSE)
+fviz_cluster(km.res, geom = "point", ellipse.type = "norm",
+             palette = "jco", ggtheme = theme_minimal())
+
+```
+```{r}
+sil <- silhouette(km2.res$cluster, dist(comicsClustering))
+fviz_silhouette(sil)
+```
+
+
+```{r}
+silinfo <- km2.res$silinfo
+# Valor medio de Silhouette para cada cluster
+silinfo$clus.avg.widths
+# Media de todos los valores de Silhouette para cada individuo
+silinfo$avg.width
+```
+
+
+```{r}
+#Clasificacion  mediante maquinas vector soporte:
+#install.packages('caTools') 
+library(caTools) 
+#eliminamos id, nombre, url slug,fecha de aparicion que no son relevantes a priori para la clasificación
+comicsSVM<- allcomics[,-c(1,2,3,15)]
+
+#Para realizar el clustering voy a tener que convertir una serie de variables categoricas en numericas:
+
+#Niveles de la identidad (siguiendo unique): 1(Secret Identity),2(No Dual Identity), 3(NOT SPECIFIED), 4(Public Identity), #5(Identity Unknown), 6(Known to Authorities Identity)
+comicsSVM$ID=as.numeric(factor(comicsSVM$ID, levels = unique(comicsSVM$ID)))
+
+#repetimos el mismo proceso para otras variables categoricas como son:Align, eye, hair, sex,alive, y mes.aparicion
+comicsSVM$ALIGN=as.numeric(factor(comicsSVM$ALIGN, levels = unique(comicsSVM$ALIGN)))
+
+comicsSVM$EYE=as.numeric(factor(comicsSVM$EYE, levels = unique(comicsSVM$EYE)))
+
+comicsSVM$SEX=as.numeric(factor(comicsSVM$SEX, levels = unique(comicsSVM$SEX)))
+
+comicsSVM$HAIR=as.numeric(factor(comicsSVM$HAIR, levels = unique(comicsSVM$HAIR)))
+
+comicsSVM$ALIVE=as.numeric(factor(comicsSVM$ALIVE, levels = unique(comicsSVM$ALIVE)))
+
+comicsSVM$MES.APARICION=as.numeric(factor(comicsSVM$MES.APARICION, levels = unique(comicsSVM$MES.APARICION)))
+
+#comicsSVM$BRAND=as.numeric(factor(comicsSVM$BRAND, levels = unique(comicsSVM$BRAND)))
+
+#Para realizar el clustering voy a tener que convertir una serie de variables categoricas en numericas:
+
+
+
+#repetimos el mismo proceso para otras variables categoricas como son:Align, eye, hair, sex,alive, y mes.aparicion
+
+  
+set.seed(123) 
+split = sample.split(comicsSVM, SplitRatio = 0.75) 
+  
+training_set_svm = subset(comicsSVM, split == TRUE) 
+test_set_svm = subset(comicsSVM, split == FALSE) 
+
+#install.packages('e1071') 
+library(e1071) #libreria con SVM
+
+classifier = svm(formula =BRAND ~ ., 
+                 data = training_set_svm, 
+                 type = 'C-classification', 
+                 kernel = 'linear') 
+
+
+y_pred = predict(classifier, newdata = test_set_svm[-17]) 
+
+
+```
+

@@ -924,6 +924,58 @@ pie(table(allcomics$DECADA.APARICION[allcomics$BRAND=="DC"]),main = "Apariciones
 
 ```
 
+
+```{r}
+#REGLAS DE ASOCIACIÓN
+
+#Parámetros a optimizar
+soporte=0.05
+confianza=0.8
+umbral_lift=1
+
+#Creamos un nuevo dataset para trabajar con las variables que más nos interesan
+allcomics_aso<-allcomics
+allcomics_aso$APPEARANCES<-NULL
+allcomics_aso$page_id<-NULL
+allcomics_aso$name<-NULL
+allcomics_aso$NAME.LENGTH<-NULL
+allcomics_aso$URL.LENGTH<-NULL
+allcomics_aso$urlslug<-NULL
+allcomics_aso$FECHA.APARICION<-NULL
+allcomics_aso$MEDIA.APARICIONES.ANIO<-NULL
+allcomics_aso$ANIOS.DESDE.APARICION<-NULL
+allcomics_aso$MES.APARICION<-NULL
+allcomics_aso$YEAR<-NULL
+allcomics_aso$TRIMESTRE.APARICION<-NULL
+allcomics_aso$GSM<-NULL
+allcomics_aso$DECADA.APARICION<-factor(allcomics_aso$DECADA.APARICION)
+
+#Nos creamos todas las combinaciones de atributos para seleccionar solo los que nos interesen más
+factores<-c(sapply(allcomics_aso, levels))
+i=0
+l<-c()
+for(factor in factores)
+{
+  i=i+1
+  atrib=names(factores)[i]
+  for(elemento in factor)
+  {
+    if(elemento!="Identity Unknown" && elemento!="NOT SPECIFIED"){
+      l<-c(l,paste(atrib,"=",elemento,sep = ""))
+    }
+    
+  }
+}
+
+reglas <- apriori(allcomics_aso, parameter = list(minlen=1, supp=soporte, conf=confianza), appearance = list(both=l), control = list(verbose=F))
+reglas<-subset(reglas, subset = lift > umbral_lift)
+reglas.ord <- sort(reglas, by="lift")
+diag(subset.matrix) <- 0
+redundantes <- colSums(subset.matrix, na.rm=T) >= 1
+reglas.dep <-reglas.ord[redundantes]
+inspect(reglas.dep)
+```
+
 # Predicción de Cantidad de Apariciones, a traves de RANDOM FOREST
 
 Ahora que hemos creado nuestro modelo, lo usaremos para clasificar la marca del comic

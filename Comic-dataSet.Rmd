@@ -1215,6 +1215,7 @@ comicsSVM$HAIR=as.numeric(factor(comicsSVM$HAIR, levels = unique(comicsSVM$HAIR)
 comicsSVM$ALIVE=as.numeric(factor(comicsSVM$ALIVE, levels = unique(comicsSVM$ALIVE)))
 
 comicsSVM$MES.APARICION=as.numeric(factor(comicsSVM$MES.APARICION, levels = unique(comicsSVM$MES.APARICION)))
+comicsSVM$BRAND=factor(comicsSVM$BRAND,levels=unique(comicsSVM$BRAND))
 
 #comicsSVM$BRAND=as.numeric(factor(comicsSVM$BRAND, levels = unique(comicsSVM$BRAND)))
 
@@ -1231,17 +1232,73 @@ split = sample.split(comicsSVM, SplitRatio = 0.75)
 training_set_svm = subset(comicsSVM, split == TRUE) 
 test_set_svm = subset(comicsSVM, split == FALSE) 
 
+
 #install.packages('e1071') 
 library(e1071) #libreria con SVM
 
 classifier = svm(formula =BRAND ~ ., 
                  data = training_set_svm, 
-                 type = 'C-classification', 
-                 kernel = 'linear') 
+                 type = 'C-classification', #indica que se use svm para clasificacion
+                 kernel = 'linear',cost = 10, scale = FALSE) 
 
 
 y_pred = predict(classifier, newdata = test_set_svm[-17]) 
 
 
+```
+```{r}
+#install.packages("plotROC")
+library(plotROC)
+labels=as.numeric(factor(test_set_svm$BRAND,levels=unique(test_set_svm$BRAND)))
+rocplot <- ggplot(test_set_svm, aes(d = as.numeric(y_pred), m = labels))+ geom_roc(n.cuts=20,labels=FALSE)
+rocplot
+#library(ROCR)
+#pred <- prediction(as.numeric(y_pred),as.numeric(test_set_svm[17]))
+```
+
+```{r}
+cm=confusionMatrix(y_pred,test_set_svm$BRAND, positive = NULL, dnn = c("Prediction", "Reference"))
+cm
+
+```
+```{r}
+#test_set_svm$BRAND<-as.numeric(test_set_svm$BRAND)
+plot(classifier,test_set_svm,NAME.LENGTH~URL.LENGTH)
+plot(classifier,test_set_svm,DECADA.APARICION~URL.LENGTH)
+plot(classifier,test_set_svm,ANIOS.DESDE.APARICION~APPEARANCES)
+#plot(classifier,test_set_svm,BRAND~URL.LENGTH)
+```
+```{r}
+x=as.numeric(test_set_svm$BRAND)
+
+```
+
+```{r}
+comicsSVMsinURL=comicsSVM[-11]
+set.seed(123) 
+split = sample.split(comicsSVM, SplitRatio = 0.75) 
+  
+training_set_svm2 = subset(comicsSVMsinURL, split == TRUE) 
+test_set_svm2 = subset(comicsSVMsinURL, split == FALSE) 
+
+
+#install.packages('e1071') 
+library(e1071) #libreria con SVM
+
+classifier2 = svm(formula =BRAND ~ ., 
+                 data = training_set_svm2, 
+                 type = 'C-classification', #indica que se use svm para clasificacion
+                 kernel = 'linear') 
+
+
+y_pred2 = predict(classifier2, newdata = test_set_svm2[-16]) 
+cm2=confusionMatrix(y_pred2,test_set_svm2$BRAND, positive = NULL, dnn = c("Prediction", "Reference"))
+cm2
+
+```
+```{r}
+library(plotROC)
+rocplot2 <- ggplot(test_set_svm2, aes(d = as.numeric(y_pred2), m = labels))+ geom_roc(n.cuts=20,labels=FALSE)
+rocplot2
 ```
 

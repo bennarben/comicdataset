@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #librerias base
 library(tidyverse)
 library(caret)
+library(arules)
 library (caTools)
 library(readr)
 library(lubridate)

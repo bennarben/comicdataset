@@ -1,0 +1,1681 @@
+---
+title: 'Proyecto Data Science: The Comic Dataset'
+author: 'Grupo 1: Benjamín Naranjo, Carlos Capitán, Guillermo Rodriguez, Carlos Espinoza'
+date: "Marzo 25, 2020"
+output:
+  html_document:
+    df_print: default
+    highlight: tango
+    theme: readable
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+       message = FALSE,
+       warning = FALSE)
+```
+# Introducción
+El tema escogido para el proyecto de la asignatura es el conjunto de datos extraído desde: https://github.com/fivethirtyeight/data/tree/master/comic-characters, correspondiente a los personajes de las principales casas del comic.
+
+El informe de este kernel se componente en:  
+
+1. Carga y Análisis inicial de los Datos 
+2. Ingeniería de Atributos.  
+3. ETL: Extract, Load & Transform  
+4. Análisis Exploratorio de los Datos
+5. Reglas de Asociación: ¿Hay patrones ocultos en las características de los personajes? 
+6. Machine Learning: Predecir la cantidad apariciones de personaje en base a las variables del conjunto de datos. 
+
+El paso inicial consiste en cargar las librerías y dependencias que requieren las funciones a utilizar.
+
+```{r Librerias iniciales, echo=FALSE}
+#limpiar el ambiente
+#rm(list = ls())
+
+#librerias base
+library(tidyverse)
+library(caret)
+library (caTools)
+#library(readr)
+library(lubridate)
+library(eeptools)
+library(ggplot2)
+library(ggpubr)
+library(plotly) # Interactive visualizations
+library(ggthemes) # Visualization themes
+theme_set(theme_pubr())
+library(viridis) # Color scales
+library(corrgram)
+library(corrplot) # Correlation visualizations
+#library(gridExtra) # Grids for visualizations
+#library(magrittr) # needs to be run every time you start R and want to use %>%
+library(dplyr)    # alternatively, this also loads %>%
+library(randomForest) # Classification algorithm
+library(rpart)
+library(rpart.plot)
+library(VIM)
+library(arules)
+library(arulesViz)
+library(agricolae)
+library(DMwR)
+library(ROCR)
+library(plotROC)
+library(tidyr)
+library(forcats)
+library(hrbrthemes)
+
+```
+
+Luego, creamos dos funciones auxiliares para uso posterior en el conjunto de datos, una para el cálculo de moda y otra para el cálculo de la década de aparición de los personajes.
+
+```{r Funciones iniciales}
+
+################################################################
+#FUNCION PARA CALCULO DE DECADA
+floor_decade    = function(value){ return(value - value %% 10) }
+mi_moda<-function(var){
+  frec.var<-table(var)
+  valor<-which(frec.var==max(frec.var)) # Elementos con el valor máximo
+  names(valor)
+}
+################################################################
+
+```
+# Carga y Análisis Inicial de los Datos
+
+La información de los personajes de los COMICS, está inicialmente dividida en 2 conjuntos de datos: "DC" y "MARVEL", los cuales serán leídos, analizados, y posteriormente unidos en uno general.
+
+dc <- read.csv("dc-wikia-data.csv")
+marvel <- read.csv("marvel-wikia-data.csv")
+
+```{r Lectura Datasets, echo=FALSE}
+
+getwd()
+dir()
+dc <- read.csv("dc-wikia-data.csv")
+str(dc)
+summary(dc)
+
+marvel <- read.csv("marvel-wikia-data.csv")
+str(marvel)
+summary(marvel)
+
+```
+# Ingeniería de Atributos
+
+Se realizará una revisión de los elementos faltantes en cada conjunto de datos, así como el tratamiento básico de estos datos: normalización de clasificación, transformación de fechas.
+
+```{r Ingenieria a los datos}
+
+#Definicion de Tipos correctos de variables
+dc$name <- as.character(dc$name)
+dc$urlslug <- as.character(dc$urlslug)
+dc$FIRST.APPEARANCE <- as.character(dc$FIRST.APPEARANCE)
+
+marvel$name <- as.character(marvel$name)
+marvel$urlslug <- as.character(marvel$urlslug)
+marvel$FIRST.APPEARANCE <- as.character(marvel$FIRST.APPEARANCE)
+
+```
+
+
+
+## Detección de elementos faltantes y vacios.
+
+Se realizará un análisis previo para determinar los datos faltantes de cada dataset, luego esta información será tomada como base, para el tratamiento respectivo de los datos.
+
+Este código ha sido oculto, pero puede mostrarse a través del botón: 
+
+<p>
+  <a class="btn btn-info btn-sm" data-toggle="collapse" data-target="#collapseToggle1" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Mostrar/Ocultar codigo
+  </a>
+</p>
+
+<div class="collapse" id="collapseToggle1">
+  <div class="card card-body">
+
+```{r Deteccion de vacios}
+
+################DC DATASET##############################
+
+
+length(which(is.na(dc$page_id)))
+length(which(dc$page_id==''))
+
+length(which(is.na(dc$name)))
+length(which(dc$name==''))
+
+length(which(is.na(dc$urlslug)))
+length(which(dc$urlslug==''))
+
+length(which(is.na(dc$ID)))
+length(which(dc$ID==''))
+
+length(which(is.na(dc$ALIGN)))
+length(which(dc$ALIGN==''))
+
+length(which(is.na(dc$EYE)))
+length(which(dc$EYE==''))
+
+length(which(is.na(dc$HAIR)))
+length(which(dc$HAIR==''))
+
+length(which(is.na(dc$SEX)))
+length(which(dc$SEX==''))
+
+length(which(is.na(dc$GSM)))
+length(which(dc$GSM==''))
+
+length(which(is.na(dc$ALIVE)))
+length(which(dc$ALIVE==''))
+
+length(which(is.na(dc$APPEARANCES)))
+length(which(dc$APPEARANCES==''))
+
+length(which(is.na(dc$FIRST.APPEARANCE)))
+length(which(dc$FIRST.APPEARANCE==''))
+
+length(which(is.na(dc$YEAR)))
+length(which(dc$YEAR==''))
+
+
+############MARVEL DATASET##############################
+
+length(which(is.na(marvel$page_id)))
+length(which(marvel$page_id==''))
+
+length(which(is.na(marvel$name)))
+length(which(marvel$name==''))
+
+length(which(is.na(marvel$urlslug)))
+length(which(marvel$urlslug==''))
+
+length(which(is.na(marvel$ID)))
+length(which(marvel$ID==''))
+
+length(which(is.na(marvel$ALIGN)))
+length(which(marvel$ALIGN==''))
+
+length(which(is.na(marvel$EYE)))
+length(which(marvel$EYE==''))
+
+length(which(is.na(marvel$HAIR)))
+length(which(marvel$HAIR==''))
+
+length(which(is.na(marvel$SEX)))
+length(which(marvel$SEX==''))
+
+length(which(is.na(marvel$GSM)))
+length(which(marvel$GSM==''))
+
+length(which(is.na(marvel$ALIVE)))
+length(which(marvel$ALIVE==''))
+
+length(which(is.na(marvel$APPEARANCES)))
+length(which(marvel$APPEARANCES==''))
+
+length(which(is.na(marvel$FIRST.APPEARANCE)))
+length(which(marvel$FIRST.APPEARANCE==''))
+
+length(which(is.na(marvel$Year)))
+length(which(marvel$Year==''))
+
+
+```
+
+</div>
+</div>
+
+## Tratamiento de observaciones incompletas.
+
+Se realizará un análisis previo para determinar los datos faltantes de cada conjunto de datos, luego esta información será tomada como base, para el tratamiento respectivo de los datos.
+
+
+<p>
+  <a class="btn btn-info btn-sm" data-toggle="collapse" data-target="#collapseToggle2" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Mostrar/Ocultar codigo
+  </a>
+</p>
+
+<div class="collapse" id="collapseToggle2">
+  <div class="card card-body">
+
+Para el ID crearemos una nueva categoría "NOT SPECIFIED", en ambos conjuntos de datos.
+
+
+```{r TRATAMIENTO ID VACIOS}
+
+#PARA ID FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$ID <- as.character(dc$ID) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$ID[dc$ID==''] <- 'NOT SPECIFIED' 
+dc$ID <- factor (dc$ID) #RECONVERSION A FACTOR
+
+#PARA ID FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$ID <- as.character(marvel$ID) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$ID[marvel$ID==''] <- 'NOT SPECIFIED' 
+marvel$ID <- factor (marvel$ID) #RECONVERSION A FACTOR
+
+```
+
+Para el ALIGN crearemos una nueva categoría "NOT SPECIFIED", en ambos conjuntos de datos
+
+```{r TRATAMIENTO ALIGN VACIOS}
+
+#PARA ALIGN FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$ALIGN <- as.character(dc$ALIGN) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$ALIGN[dc$ALIGN==''] <- 'NOT SPECIFIED' 
+dc$ALIGN <- factor (dc$ALIGN) #RECONVERSION A FACTOR
+
+#PARA ALIGN FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$ALIGN <- as.character(marvel$ALIGN) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$ALIGN[marvel$ALIGN==''] <- 'NOT SPECIFIED' 
+marvel$ALIGN <- factor (marvel$ALIGN) #RECONVERSION A FACTOR
+
+```
+
+Para el EYE crearemos una nueva categoría "NOT SPECIFIED", en ambos conjuntos de datos
+
+```{r TRATAMIENTO EYE VACIOS}
+
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$EYE <- as.character(dc$EYE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$EYE[dc$EYE==''] <- 'NOT SPECIFIED' 
+dc$EYE <- factor (dc$EYE) #RECONVERSION A FACTOR
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$EYE <- as.character(marvel$EYE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$EYE[marvel$EYE==''] <- 'NOT SPECIFIED' 
+marvel$EYE <- factor (marvel$EYE) #RECONVERSION A FACTOR
+
+```
+
+Para el HAIR  crearemos una nueva categoría "NOT SPECIFIED", en ambos conjuntos de datos
+
+```{r TRATAMIENTO HAIR VACIOS}
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+dc$HAIR <- as.character(dc$HAIR) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$HAIR[dc$HAIR==''] <- 'NOT SPECIFIED' 
+dc$HAIR <- factor (dc$HAIR) #RECONVERSION A FACTOR
+
+#PARA EYE FALTANTES: CREAMOS CATEGORIA "NOT SPECIFIED"
+marvel$HAIR <- as.character(marvel$HAIR) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$HAIR[marvel$HAIR==''] <- 'NOT SPECIFIED' 
+marvel$HAIR <- factor (marvel$HAIR) #RECONVERSION A FACTOR
+
+```
+
+Para el SEX, reemplazaremos por la moda.
+
+```{r TRATAMIENTO SEX VACIOS}
+
+#PARA EL SEXO SE OPTA POR REEMPLAZAR EL VALOR POR LA MODA.
+mi_moda(dc$SEX)
+dc$SEX[dc$SEX==''] <- 'Male Characters' 
+
+#PARA SEX FALTANTES: POR LO QUE SE OPTA POR REEMPLAZAR EL VALOR POR LA MODA.
+mi_moda(marvel$SEX)
+marvel$SEX[marvel$SEX==''] <- 'Male Characters' 
+
+```
+
+Para el GENDER, se detecta la mezcla de SEX y GENDER indistintamente, por lo que se procede a depurar los GENEROS en la categoría respectiva GSM, y se asigna manualmente el sexo que corresponde, luego de una búsqueda en internet de los personajes.
+
+Adicionalmente, ante la ausencia del género HETEROSEXUAL, se crea la categoría, y es asignada a todos aquellos personajes que no tienen géneros alternativos.
+
+```{r TRATAMIENTO GENDER VACIOS}
+
+#DETECTAMOS "TRANSGENDER" Y "GENDERLESS" COMO SEXO
+#PROCEDEMOS CON LA DEPURACION DE TRANSGENDER Y GENDERLESS COMO SEXO, Y ASIGNACION DEL GENERO A LA VARIABLE CORRECTA "GSM".
+which(dc$SEX=='Transgender Characters')
+which(dc$SEX=='Genderless Characters')
+
+dc[3878, 'SEX'] <- 'Female Characters'
+dc[797, 'SEX'] <- 'Male Characters'
+dc[906, 'SEX'] <- 'Male Characters'
+dc[907, 'SEX'] <- 'Male Characters'
+dc[921, 'SEX'] <- 'Male Characters'
+dc[1123, 'SEX'] <- 'Male Characters'
+dc[1295, 'SEX'] <- 'Male Characters'
+dc[1871, 'SEX'] <- 'Male Characters'
+dc[2146, 'SEX'] <- 'Male Characters'
+dc[2255, 'SEX'] <- 'Male Characters'
+dc[2678, 'SEX'] <- 'Male Characters'
+dc[2801, 'SEX'] <- 'Male Characters'
+dc[3608, 'SEX'] <- 'Male Characters'
+dc[3729, 'SEX'] <- 'Male Characters'
+dc[4092, 'SEX'] <- 'Male Characters'
+dc[5014, 'SEX'] <- 'Male Characters'
+dc[5080, 'SEX'] <- 'Male Characters'
+dc[5336, 'SEX'] <- 'Male Characters'
+dc[5844, 'SEX'] <- 'Male Characters'
+dc[5857, 'SEX'] <- 'Male Characters'
+dc[6854, 'SEX'] <- 'Male Characters'
+
+dc$GSM <- as.character (dc$GSM)
+dc[797, 'GSM'] <- 'Agender Characters'
+dc[906, 'GSM'] <- 'Agender Characters'
+dc[907, 'GSM'] <- 'Agender Characters'
+dc[921, 'GSM'] <- 'Agender Characters'
+dc[1123, 'GSM'] <- 'Agender Characters'
+dc[1295, 'GSM'] <- 'Agender Characters'
+dc[1871, 'GSM'] <- 'Agender Characters'
+dc[2146, 'GSM'] <- 'Agender Characters'
+dc[2255, 'GSM'] <- 'Agender Characters'
+dc[2678, 'GSM'] <- 'Agender Characters'
+dc[2801, 'GSM'] <- 'Agender Characters'
+dc[3608, 'GSM'] <- 'Agender Characters'
+dc[3729, 'GSM'] <- 'Agender Characters'
+dc[4092, 'GSM'] <- 'Agender Characters'
+dc[5014, 'GSM'] <- 'Agender Characters'
+dc[5080, 'GSM'] <- 'Agender Characters'
+dc[5336, 'GSM'] <- 'Agender Characters'
+dc[5844, 'GSM'] <-'Agender Characters'
+dc[5857, 'GSM'] <- 'Agender Characters'
+dc[6854, 'GSM'] <- 'Agender Characters'
+dc[3878, 'GSM'] <- 'Agender Characters'
+dc[1295, 'GSM'] <- 'Genderfluid Characters'
+dc$SEX <- factor (dc$SEX) #RECONVERSION A FACTOR
+dc$GSM <- factor (dc$GSM) #RECONVERSION A FACTOR
+
+#PARA GSM FALTANTES: AQUELLOS PERSONAJES QUE NO TIENEN DEFINIDOS GENEROS ALTERNATIVOS SON CLASIFICADOS COMO "HETEROSEXUAL"
+dc$GSM <- as.character(dc$GSM) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc$GSM[dc$GSM==''] <- 'Heterosexual Characters'  
+dc$GSM <- factor (dc$GSM) #RECONVERSION A FACTOR
+
+#DETECTAMOS "AGENDER" Y "GENDERFLUID" COMO SEXO
+#PROCEDEMOS CON LA DEPURACION DE TRANSGENDER Y GENDERLESS COMO SEXO, Y ASIGNACION DEL GENERO A LA VARIABLE CORRECTA "GSM".
+length(which(marvel$SEX=='Agender Characters'))
+length(which(marvel$SEX=='Genderfluid Characters'))
+marvel$GSM <- as.character (marvel$GSM)
+marvel$GSM[marvel$SEX=='Agender Characters'] <- 'Agender Characters' 
+marvel$GSM[marvel$SEX=='Genderfluid Characters'] <- 'Genderfluid Characters' 
+marvel$SEX[marvel$SEX=='Agender Characters'] <- 'Male Characters' 
+marvel$SEX[marvel$SEX=='Genderfluid Characters'] <- 'Male Characters' 
+marvel$SEX <- factor (marvel$SEX) #RECONVERSION A FACTOR
+marvel$GSM <- factor (marvel$GSM) #RECONVERSION A FACTOR
+
+
+#PARA GSM FALTANTES: AQUELLOS PERSONAJES QUE NO TIENEN DEFINIDOS GENEROS ALTERNATIVOS SON CLASIFICADOS COMO "HETEROSEXUAL"
+marvel$GSM <- as.character(marvel$GSM) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$GSM[marvel$GSM==''] <- 'Heterosexual Characters' 
+marvel$GSM <- factor (marvel$GSM) #RECONVERSION A FACTOR
+
+
+```
+
+Para el ALIVE, en DC, el estado es asignado manualmente luego de una búsqueda en internet. Mientras que en Marvel se reemplaza por ´Living Characters´ que es el factor predominante.
+
+```{r TRATAMIENTO ALIVE VACIOS}
+
+#PARA ALIVE FALTANTES: LOS ASIGNAREMOS SEGUN CORRESPONDA CON INFORMACION DE INTERNET
+which(dc$ALIVE=='')
+dc$ALIVE <- as.character(dc$ALIVE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+dc[2727, 'ALIVE'] <- 'Living Characters'
+dc[3251, 'ALIVE'] <- 'Living Characters'
+dc[6855, 'ALIVE'] <- 'Living Characters'
+dc$ALIVE <- factor (dc$ALIVE) #RECONVERSION A FACTOR
+
+
+
+#PARA ALIVE FALTANTES: LOS ASIGNAREMOS SEGUN CORRESPONDA CON INFORMACION DE INTERNET
+which(marvel$ALIVE=='')
+marvel$ALIVE <- as.character(marvel$ALIVE) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+marvel$ALIVE[marvel$ALIVE=='']<-'Living Characters'
+marvel$ALIVE <- factor (marvel$ALIVE) #RECONVERSION A FACTOR
+
+```
+
+Para EYE, se detecta una mezcla en los datos EYE y HAIR, que es depurada manualmente. 
+
+```{r TRATAMIENTO CORRECION EYE HAIR}
+
+#CORRECCION DE CARACTERISTICAS FISICAS: EYE, HAIR
+levels(dc$EYE)
+which(dc$EYE=='Auburn Hair')
+dc$HAIR<-as.character(dc$HAIR)
+dc$EYE<-as.character(dc$EYE)
+dc$HAIR[dc$EYE=='Auburn Hair'] <- 'Auburn Hair' 
+dc$EYE[dc$EYE=='Auburn Hair'] <- 'NOT SPECIFIED'
+dc$HAIR<-factor(dc$HAIR)
+dc$EYE<-factor(dc$EYE)
+
+
+
+```
+
+Para FIRST.APPEARANCE, el año de primera aparición del personaje, procedemos a eliminar las observaciones que no cuenten con este dato. ya que gran parte del análisis exploratorio a realizar requiere este dato, para contrastar la evolución en el tiempo. 
+
+```{r TRATAMIENTO FIRST APPEARANCES VACIOS}
+
+
+#PARA FIRST.APPEARANCE FALTANTES: ELIMINACION DE OBSERVACIONES
+dc<-subset(dc, !is.na(dc$FIRST.APPEARANCE) | dc$FIRST.APPEARANCE=='')
+
+#PARA YEAR: ELIMINACION DE OBSERVACIONES
+dc<-subset(dc, !is.na(dc$YEAR))
+
+#PARA FIRST.APPEARANCE FALTANTES: ELIMINACION DE OBSERVACIONES
+marvel<-subset(marvel, !is.na(marvel$FIRST.APPEARANCE) | marvel$FIRST.APPEARANCE=='')
+
+#PARA YEAR: ELIMINACION DE OBSERVACIONES
+marvel<-subset(marvel, !is.na(marvel$Year))
+
+```
+
+Para la variable APPEARANCES, es necesaria la creación de un modelo de regresión lineal que calcule las apariciones de los datos faltantes. esta será creada luego de la fase de ETL, en que se normalicen los datos que serán insumos para ese modelo.
+
+</div>
+</div>
+
+# Tratamiento de los Datos (ETL)
+
+En esta sección realizaremos crearemos variables nuevas relacionadas con los datos iniciales del conjunto de datos, que brindarán una mejor perspectiva para la visualización y clasificación de los datos.
+
+Como primer paso tenemos la creación de variables: NAME LENGTH, URL LENGTH, luego homogenizaremos la fecha, para calcular dos variables relacionadas: DECADA y TRIMESTRE de aparición.
+
+finalmente crearemos el modelo de regresión lineal, para el cálculo de las apariciones faltantes en algunas observaciones.
+
+<p>
+  <a class="btn btn-info btn-sm" data-toggle="collapse" data-target="#collapseToggle3" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Mostrar/Ocultar codigo
+  </a>
+</p>
+
+<div class="collapse" id="collapseToggle3">
+  <div class="card card-body">
+
+
+
+```{r ETL NUEVAS VARIABLES BASICAS}
+
+#################################################################
+################INICIO CREACION DE VARIABLES#####################
+#################################################################
+
+#AGREGA COLuMNA NAME LENGTH
+dc$NAME.LENGTH<-nchar(dc$name, type = "chars", allowNA = FALSE, keepNA = NA)
+marvel$NAME.LENGTH<-nchar(marvel$name, type = "chars", allowNA = FALSE, keepNA = NA)
+
+
+#AGREGA COLuMNA URLLENGTH LENGTH
+dc$URL.LENGTH<-nchar(dc$urlslug, type = "chars", allowNA = FALSE, keepNA = NA)
+marvel$URL.LENGTH<-nchar(marvel$urlslug, type = "chars", allowNA = FALSE, keepNA = NA)
+
+```
+
+El tratamiento de la fecha es distinto en cada conjunto de datos, ya que no comparten el mismo formato. 
+
+```{r PARSEO FECHAS}
+#AGREGA COLUMNA CON EL PARSEO DE FECHA DE APARICION DE STRING A DATE
+dc$FECHA.APARICION<-parse_date_time(dc$FIRST.APPEARANCE, orders = c("Yb"))
+dc$FECHA.APARICION <- as.Date(dc$FECHA.APARICION)
+marvel$FECHA.APARICION<-parse_date_time2(marvel$FIRST.APPEARANCE,"by", cutoff_2000 = 20)
+marvel$FECHA.APARICION <- as.Date(marvel$FECHA.APARICION)
+
+#CORRECCION DE ERRORES DEL PARSEO DE FECHA
+which(is.na(dc$FECHA.APARICION))
+which(is.na(marvel$FECHA.APARICION))
+
+#SE REVISA QUE CONTIENEN FECHAS INCOMPLETAS, SE PROCEDE A ELIMINAR LOS REGISTROS CON FECHAS ERRONEAS.
+dc<-subset(dc, !is.na(dc$FECHA.APARICION))
+#ELIMINACION DE COLUMNA DE FECHA ORIGINAL SIN PARSEAR
+dc[ ,c('FIRST.APPEARANCE')] <- list(NULL)
+marvel[ ,c('FIRST.APPEARANCE')] <- list(NULL)
+
+```
+
+Se crean las variables relacionadas a la fecha de aparición del personaje.
+
+```{r CREACION VARIABLES FECHAS}
+#AGREGA COLUMNA CON LOS AñOS DESDE LA APARICION DEL PERSONAJE
+dc$ANIOS.DESDE.APARICION<-floor(age_calc(dc$FECHA.APARICION, enddate = Sys.Date(), units = "years", precise = TRUE))
+marvel$ANIOS.DESDE.APARICION<-floor(age_calc(marvel$FECHA.APARICION, enddate = Sys.Date(), units = "years", precise = TRUE))
+
+#AGREGA COLUMNA CON EL PARSEO MES DE APARICION
+dc$MES.APARICION <- ymd(dc$FECHA.APARICION) %>% 
+   lubridate::month(label = TRUE, abbr = FALSE)
+
+marvel$MES.APARICION <- ymd(marvel$FECHA.APARICION) %>% 
+   lubridate::month(label = TRUE, abbr = FALSE)
+
+#AGREGA COLUMNA CON EL PARSEO TRIMESTRE DE APARICION
+dc$TRIMESTRE.APARICION<- ymd(dc$FECHA.APARICION) %>%
+   lubridate::quarter()  # Grab quarter.
+marvel$TRIMESTRE.APARICION<- ymd(marvel$FECHA.APARICION) %>%
+   lubridate::quarter()  # Grab quarter.
+
+#AGREGA COLUMNA CON LA DECADA DE APARICION
+dc$DECADA.APARICION <- floor_decade(dc$YEAR)
+marvel$DECADA.APARICION <- floor_decade(marvel$Year)
+
+```
+
+El modelo de regresión lineal usa varias variables, relacionadas principalmente al PAGE_ID Y EL URL.LENTGH, ya que de forma empírica hemos podido observar que los personajes más antiguos que suelen tener mayor número de apariciones tienen un ID y URL menor que aquellos personajes modernos con menor número de apariciones.
+
+```{r REGRESION LINEAL}
+
+#################################################################
+######INICIO MODELO DE REGRESION PARA APARICIONES FALTANTES######
+#################################################################
+
+#PARA APPEARANCES FALTANTES: LOS ASIGNAREMOS CON UN MODELO DE REGRESION LINEAL
+modelo_dc <- lm(dc$APPEARANCES~dc$page_id + dc$NAME.LENGTH + + dc$URL.LENGTH + dc$ID + dc$ALIGN + dc$EYE + dc$HAIR+ dc$SEX+ dc$GSM+ dc$ALIVE+ dc$YEAR+ dc$FECHA.APARICION,
+             data=dc,na.action=na.exclude)
+
+modelo_marvel <- lm(marvel$APPEARANCES~marvel$page_id + marvel$NAME.LENGTH + + marvel$URL.LENGTH + marvel$ID + marvel$ALIGN + marvel$EYE + marvel$HAIR+ marvel$SEX+ marvel$GSM+ marvel$ALIVE+ marvel$Year+ marvel$FECHA.APARICION,
+             data=marvel,na.action=na.exclude)
+
+summary(modelo_dc)
+summary(modelo_marvel)
+
+
+```
+
+Los modelos de regresión lineal creados tienen una precisión muy baja (R Cuadrado de 0.10 aprox.), por lo que más bien optaremos por reemplazar los valores de apariciones faltantes por la media. En el apartado de Machine Learning, trataremos de solventar este inconveniente creando un mejor modelo, de forma que pueda aprovechar mejor los datos y nos permita predecir las apariciones con una mayor fiabilidad.
+
+```{r APARICIONES FALTANTES}
+#REEMPLAZA APPEARANCES VACIOS POR LA MEDIA
+dc$APPEARANCES[is.na(dc$APPEARANCES)]<-ceiling(mean(dc$APPEARANCES,na.rm=TRUE))
+marvel$APPEARANCES[is.na(marvel$APPEARANCES)]<-ceiling(mean(marvel$APPEARANCES,na.rm=TRUE))
+
+
+#AGREGA COLUMNA CON LAS APARICIONES MEDIAS POR AÑO
+dc$MEDIA.APARICIONES.ANIO<-(dc$APPEARANCES/dc$ANIOS.DESDE.APARICION)
+marvel$MEDIA.APARICIONES.ANIO<-(marvel$APPEARANCES/marvel$ANIOS.DESDE.APARICION)
+
+which(is.na(marvel))
+summary(marvel)
+
+which(is.na(dc))
+summary(dc)
+
+#################################################################
+######FIN MODELO DE REGRESION PARA APARICIONES FALTANTES#########
+#################################################################
+
+
+```
+
+
+</div>
+</div>
+
+# Análisis Exploratorio de los Datos
+
+En esta sección realizaremos un análisis de la correlación dentro de cada conjunto de datos, para identificar las tendencias dentro de cada uno de estos.
+
+## Correlación DC
+
+```{r COR DC}
+#################################################################
+#############INICIO CORRELACION DE VARIABLES#####################
+#################################################################
+dccorrelation<-dc[,-13:-20]
+dccorrelation$name<-NULL
+dccorrelation$urlslug<-NULL
+dccorrelation$ID<-as.numeric(dccorrelation$ID)
+dccorrelation$ALIGN<-as.numeric(dccorrelation$ALIGN)
+dccorrelation$HAIR<-as.numeric(dccorrelation$HAIR)
+dccorrelation$EYE<-as.numeric(dccorrelation$EYE)
+dccorrelation$SEX<-as.numeric(dccorrelation$SEX)
+dccorrelation$GSM<-as.numeric(dccorrelation$GSM)
+dccorrelation$ALIVE<-as.numeric(dccorrelation$ALIVE)
+
+cor(dccorrelation)
+corrgram(dccorrelation, order=NULL, lower.panel=panel.shade, upper.panel=panel.pie, text.panel=panel.txt, main="Correlación del Dataset DC Comics")
+
+
+#################################################################
+################FIN CORRELACION DE VARIABLES#####################
+#################################################################
+
+```
+
+En el diagrama escogido para representar la correlación, los PIE CHARTS representan la "fuerza" de correlación de una variable con el resto. de lo cual se deduce:
+
+
+- PAGE_ID: guarda cierta correlación inversa con ID (tipo de identidad del personaje) y con APPEARANCES (cantidad de apariciones). Mientras que es positiva con EYE (color de ojos), y YEAR (año de primera aparición) del personaje. Esto puede deberse a como están agrupados los personajes en el sitio web de la WIKIA.
+
+- ID (la identidad del personaje): guarda una leve correlación inversa con ALIGN (bando: bueno, malo, etc.) y EYE, parece ser que la identidad del personaje tiene cierta inferencia en su color de ojos y el bando , al que pertenece, también tiene una baja correlación positiva con APPEARANCES.
+
+- EYE: con HAIR guardan una leve correlación positiva. parece haber cierta tendencia a una asociación de color de ojos y cabellos, también, EYE y SEX tienen una correlación positiva que podría indicar cierta tendencia a un color de ojos predominante para cada sexo. Esto podría ser explorado con reglas de asociación. Con APPEARANCES guarda una correlación inversa, se puede inferir que la cantidad de apariciones del personaje está relacionada con el color de los ojos.
+
+-HAIR: tiene una correlación positiva muy baja con SEX. podría indicar una tendencia entre el color de cabello y el sexo del personaje
+
+-SEX muestra una correlación inversa con YEAR, esto denota que a través del tiempo se han dado cambios en la cantidad de personajes de cada sexo.
+
+- APPEARANCES (la cantidad de apariciones del personaje) guarda una correlación inversa con el año de aparición del personaje, lo cual puede sonar lógico, mientras más tiempo tiene un personaje, es más probable que acumule más apariciones.
+
+- Se puede observar que la correlación es prácticamente nula en el resto de las variables, esto tendrá un impacto en los modelos de clasificación o regresión que se realicen.
+
+## Correlación Marvel
+
+En esta sección realizaremos un análisis de la correlación dentro de cada conjunto de datos, para identificar las tendencias dentro de cada uno de estos.
+
+```{r COR Marvel}
+
+marvelcorrelation<-marvel[,-13:-20]
+marvelcorrelation$name<-NULL
+marvelcorrelation$urlslug<-NULL
+marvelcorrelation$ID<-as.numeric(marvelcorrelation$ID)
+marvelcorrelation$ALIGN<-as.numeric(marvelcorrelation$ALIGN)
+marvelcorrelation$SEX<-as.numeric(marvelcorrelation$SEX)
+marvelcorrelation$GSM<-as.numeric(marvelcorrelation$GSM)
+marvelcorrelation$HAIR<-as.numeric(marvelcorrelation$HAIR)
+marvelcorrelation$EYE<-as.numeric(marvelcorrelation$EYE)
+marvelcorrelation$ALIVE<-as.numeric(marvelcorrelation$ALIVE)
+
+cor(marvelcorrelation)
+corrgram(marvelcorrelation, order=NULL, lower.panel=panel.shade, upper.panel=panel.pie, text.panel=panel.txt, main="Correlación del Dataset Marvel Comics")
+```
+</div>
+
+En el diagrama escogido para representar la correlación, los PIE CHARTS representan la "fuerza" de correlación de una variable con el resto. de lo cual se puede observar que las correlaciones son prácticamente iguales que en el DATASET de "DC".
+
+## Unificación de los Conjuntos de Datos
+
+Luego del análisis de correlaciones, se puede observar que ambos DATASETS se comportan de forma muy similar. por lo que se procederá a la unión de ambos, para realizar un análisis exploratorio de los datos y posterior contraste.
+
+```{r Join comics}
+
+#################################################################
+################INICIO DE JOIN DE DATASETS ######################
+#################################################################
+
+#HOMOGENIZACION DE NOMBRES DE VARIABLES
+names(marvel) <- names(dc) 
+
+#JOIN DE DATAFRAMES MARVEL Y DC
+dc$BRAND<-'DC'
+marvel$BRAND<-'MARVEL'
+
+allcomics<-rbind(dc,marvel)
+
+```
+Es necesario que el nuevo conjunto de datos tenga un orden aleatorio, para que durante la creación de los modelos, estos no se vean influenciados o desbalanceados por un mal training. Para ello, usaremos la función de SAMPLE.
+
+```{r Sampling comics}
+#ALEATORIEDAD DE OBSERVACIONES
+allcomics <- allcomics[sample(nrow(allcomics)),]
+
+summary(allcomics)
+
+#################################################################
+###################FIN DE JOIN DE DATASETS ######################
+#################################################################
+```
+
+## Homogenización de Datos
+
+Es necesario homogenizar la información, ya que ciertas variables contienen sinónimos que es necesario reducir para mejorar el análisis de los datos.  
+
+```{r Homogenizacion ALLCOMICS}
+
+#################################################################
+#########INICIO DE HOMOGENIZACION DE FACTORES ###################
+#################################################################
+
+allcomics$BRAND<-factor(allcomics$BRAND)
+levels(allcomics$BRAND)
+levels(allcomics$ID)
+levels(allcomics$ALIGN)
+levels(allcomics$EYE)
+levels(allcomics$HAIR)
+levels(allcomics$GSM)
+allcomics$GSM <- as.character(allcomics$GSM) #ELIMINACION DE FACTOR PARA PODER EDITAR LOS VALORES DE LA COLUMNA
+allcomics$GSM[allcomics$GSM=='Transvestites'] <- 'Transvestites Characters' 
+allcomics$GSM <- factor (allcomics$GSM) #RECONVERSION A FACTOR
+
+which(is.na(allcomics))
+
+#################################################################
+############FIN DE HOMOGENIZACION DE FACTORES ###################
+#################################################################
+```
+
+##  Correlación de Datos de Comics Unificados
+
+Estableceremos la correlación para el conjunto de datos que contiene los COMICS de ambas casas comerciales.
+
+```{r Corr comics}
+
+#################################################################
+#############INICIO CORRELACION DE VARIABLES#####################
+#################################################################
+
+allcomicscorrelation<-allcomics[,-13:-20]
+allcomicscorrelation$ID<-as.numeric(allcomicscorrelation$ID)
+allcomicscorrelation$ALIGN<-as.numeric(allcomicscorrelation$ALIGN)
+allcomicscorrelation$SEX<-as.numeric(allcomicscorrelation$SEX)
+allcomicscorrelation$GSM<-as.numeric(allcomicscorrelation$GSM)
+allcomicscorrelation$HAIR<-as.numeric(allcomicscorrelation$HAIR)
+allcomicscorrelation$EYE<-as.numeric(allcomicscorrelation$EYE)
+allcomicscorrelation$ALIVE<-as.numeric(allcomicscorrelation$ALIVE)
+
+
+corrgram(allcomicscorrelation, order=NULL, lower.panel=panel.shade, upper.panel=panel.pie, text.panel=panel.txt, main="Correlación del Dataset de todos los Comics")
+
+#################################################################
+################FIN CORRELACION DE VARIABLES#####################
+#################################################################
+
+```
+
+Como conclusión, la matriz de correlación de todos los comics, tiene el siguiente comportamiento:
+
+- PAGE_ID: guarda cierta correlación con ID (tipo de identidad del personaje), EYE (color de ojos), y SEX del personaje, y negativa con APPEARANCES. Esto puede deberse a como están agrupados los personajes en el sitio web de la WIKIA.
+
+- ID (la identidad del personaje): guarda una leve correlación inversa con ALIGN (bando: bueno, malo, etc.), y con EYE, denotando cierta relación entre la identidad del personaje con el color de los ojos y el bando al que pertenece.
+
+- EYE: con HAIR guardan una correlación positiva. parece haber cierta tendencia a una asociación de color de ojos y cabellos, también, con SEX tiene una correlación positiva que podría indicar cierta tendencia a un color de ojos predominante para cada sexo. Esto podría ser explorado con reglas de asociación. Con APPEARANCES guarda una correlación inversa, se puede inferir que la cantidad de apariciones del personaje está relacionada con el color de los ojos.
+
+- HAIR: tiene una correlación positiva con SEX. podría indicar una tendencia entre el color de cabello y el sexo del personaje
+
+- SEX muestra una correlación inversa con YEAR, esto denota que a través del tiempo se han dado cambios en la cantidad de personajes de cada sexo.
+
+- GSM muestra correlaciones inversas con EYE y HAIR, puede denotar que los personajes con GENEROS ALTERNATIVOS tienen ciertas características EYE y HAIR distintivas.
+
+- APPEARANCES (la cantidad de apariciones del personaje) guarda una correlación inversa con el año de aparición del personaje, lo cual puede sonar lógico, mientras más tiempo tiene un personaje, es más probable que acumule más apariciones.
+
+- Se puede observar que la correlación es prácticamente nula en el resto de las variables, esto tendrá un impacto en los modelos de clasificación o regresión que se realicen.
+
+## Graficando los Datos
+
+El conjunto de datos tiene varias dimensiones sobre las cuales podemos mostrar los datos, así que, los hemos divido según la relevancia que pueden tener para algún fan de los cómics. Previo a ello, crearemos unos subconjuntos de datos que nos permitan establecer rankings y agrupaciones, de forma que podamos mostrar los datos de forma resumida, así como, unos gráficos iniciales que nos permitan comprender como está formado el DATASET: ALL COMICS.
+
+<p>
+  <a class="btn btn-info btn-sm" data-toggle="collapse" data-target="#collapseToggle4" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Mostrar/Ocultar codigo
+  </a>
+</p>
+
+<div class="collapse" id="collapseToggle4">
+  <div class="card card-body">
+
+
+```{r subgrupos}
+
+
+topcomicsPerYear<-allcomics %>%
+   arrange(desc(MEDIA.APARICIONES.ANIO)) %>%
+   head(10)
+
+topcomics<-allcomics %>%
+   arrange(desc(APPEARANCES)) %>%
+   head(10)
+
+oldestcomics<-allcomics %>%
+   arrange(YEAR) %>%
+   head(10)
+
+marcas <- allcomics %>%
+  group_by(BRAND) %>%
+  count(BRAND, sort = TRUE, name = "count")
+
+bandos <- allcomics %>%
+  count(ALIGN, sort = TRUE, name = "count")
+
+sexo <- allcomics %>%
+  group_by(SEX) %>%
+  count(SEX, sort = TRUE, name = "count")
+
+generos <- allcomics %>%
+    group_by(GSM) %>%
+  count(GSM, sort = TRUE, name = "count")
+
+caracteristicas <- allcomics %>%
+    group_by(EYE,HAIR) %>%
+  count(EYE, sort = TRUE, name = "count")
+
+generosalt <- allcomics %>%
+    filter(GSM!="Heterosexual Characters") %>%
+  group_by(GSM) %>%
+  count(GSM, sort = TRUE, name = "count")
+
+sexo_personajes <- allcomics %>%
+  group_by(BRAND,DECADA.APARICION,SEX,GSM) %>%
+  summarize(totalAppearances = sum(as.numeric(APPEARANCES)),
+            meanAppearances = mean(APPEARANCES))
+
+```
+</div>
+</div>
+
+##  Gráficos Base
+
+Estos gráficos sirven para entender como están distribuidos los datos en el conjunto de datos de todos los comics.  El primer gráfico muestra, la relación entre MARVEL y DC Comics, como se aprecia, es casi de 3 a 1.
+
+
+```{r Graph base 1, echo=FALSE}
+############ MARCAS DEL COMICS ########################
+
+# Compute percentages
+marcas$fraction = marcas$count / sum(marcas$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+marcas$ymax = cumsum(marcas$fraction)
+
+# Compute the bottom of each rectangle
+marcas$ymin = c(0, head(marcas$ymax, n=-1))
+
+# Compute label position
+marcas$labelPosition <- (marcas$ymax + marcas$ymin) / 2
+
+# Compute a good label
+marcas$label <- paste0(marcas$BRAND, "\n Total: ", marcas$count)
+ 
+# Make the plot
+ggplot(marcas, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=BRAND)) +
+  geom_rect() +
+  geom_label( x=3.5, aes(y=labelPosition, label=label), size=6) +
+  scale_fill_brewer(palette=4) +
+  coord_polar(theta="y") +
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "none")+
+labs(title = 'COMPOSICION: MARCAS DEL COMICS')
+
+```
+
+
+La composición de personajes se divide prácticamente en un 75% masculino y un 25% femenino. y la distribución en cada una de las marcas parece guardar proporciones similares (3 a 1).
+
+
+
+```{r graph base 2, echo=FALSE}
+
+################SEXO EN EL COMIC ################################
+# Compute percentages
+sexo$fraction = sexo$count / sum(sexo$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+sexo$ymax = cumsum(sexo$fraction)
+
+# Compute the bottom of each rectangle
+sexo$ymin = c(0, head(sexo$ymax, n=-1))
+ 
+par(mfrow=c(1,2))
+# Make the plot
+ggplot(sexo, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=SEX)) +
+     geom_rect() +
+     coord_polar(theta="y") +
+     xlim(c(2, 4)) +
+   labs(title = 'COMPOSICION: SEXO')
+
+ggplot(allcomics,aes(x=factor(BRAND),fill=SEX))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=scales::percent(..count../sum(..count..))),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title =  'SEXO DE LOS PERSONAJES POR MARCA') +
+  xlab("Marca")+
+  theme_tinyhand()+
+  ylab("Cantidad de Personajes")
+
+```
+
+La composición de personajes del tipo BAD CHARACTERS (Villano), es predominante sobre GOOD CHARACTERS (Héroes), sin embargo, hay un número significativo de personajes del tipo NEUTRAL, y muchos NOT SPECIFIED. Los personajes que se han convertido al bando de héroes (REFORMED CRIMINALS), es minúsculo, considerando el tamaño del DATASET.
+
+
+
+```{r graph base 3, echo=FALSE}
+
+############ BANDOS DEL COMICS ########################
+# Compute percentages
+bandos$fraction = bandos$count / sum(bandos$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+bandos$ymax = cumsum(bandos$fraction)
+
+# Compute the bottom of each rectangle
+bandos$ymin = c(0, head(bandos$ymax, n=-1))
+ 
+# Compute label position
+bandos$labelPosition <- (bandos$ymax + bandos$ymin) / 2
+
+# Compute a good label
+bandos$label <- (bandos$count)
+
+# Make the plot
+ggplot(bandos, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=ALIGN)) +
+  geom_rect() +
+  geom_label( x=3.5*1.1, aes(y=labelPosition, label=label), size=4) +
+  scale_fill_brewer(palette=4) +
+  coord_polar(theta="y") +
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "right")+
+   labs(title = 'COMPOSICION: BANDOS')
+
+```
+
+La composición de géneros de los cómics es predominantemente HETEROSEXUAL, por lo que es necesario filtrar esta categoría para poder analizar los géneros alternativos de los personajes.
+
+
+
+```{r graph base 4, echo=FALSE}
+
+
+############ GENEROS DEL COMICS ########################
+# Compute percentages
+generos$fraction = generos$count / sum(generos$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+generos$ymax = cumsum(generos$fraction)
+
+# Compute the bottom of each rectangle
+generos$ymin = c(0, head(generos$ymax, n=-1))
+ 
+# Compute label position
+generos$labelPosition <- (generos$ymax + generos$ymin) / 2
+
+# Compute a good label
+generos$label <- (generos$count)
+
+# Make the plot
+ggplot(generos, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=GSM)) +
+  geom_rect() +
+  geom_label( x=3.5*1.1, aes(y=labelPosition, label=label), size=4) +
+  scale_fill_brewer(palette=4) +
+  coord_polar(theta="y") +
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "right")+
+   labs(title = 'COMPOSICION: GENEROS')
+
+```
+
+La composición de GÉNEROS ALTERNATIVOS de personajes es principalmente HOMOSEXUAL, AGENDER, Y BISEXUAL
+
+
+```{r graph base 5, echo=FALSE}
+
+############ generosalt ALTERNATIVOS DEL COMICS ########################
+# Compute percentages
+generosalt$fraction = generosalt$count / sum(generosalt$count)
+
+# Compute the cumulative percentages (top of each rectangle)
+generosalt$ymax = cumsum(generosalt$fraction)
+
+# Compute the bottom of each rectangle
+generosalt$ymin = c(0, head(generosalt$ymax, n=-1))
+ 
+# Compute label position
+generosalt$labelPosition <- (generosalt$ymax + generosalt$ymin) / 2
+
+# Compute a good label
+generosalt$label <-  paste0(generosalt$GSM, "\n value: ", generosalt$count)
+
+# Make the plot
+ggplot(generosalt, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=GSM)) +
+  geom_rect() +
+  geom_label( x=3.5*1.1, aes(y=labelPosition, label=label), size=4) +
+  scale_fill_brewer(palette=4) +
+  coord_polar(theta="y") +
+  theme_void() +
+  theme(legend.position = "right")+
+   labs(title = 'COMPOSICION: GENEROS ALTERNATIVOS')
+
+```
+
+En este gráfico se puede observar el impacto de la II Guerra Mundial, en la industria del comic: entre 1940 y 1950 se dio una importante reducción en la aparición de nuevos personajes. Varias años después, luego de la guerra, cada una de las marcas de cómics, tienen una explosión demográfica acentuada a partir de la década de los 60´s. 
+
+```{r graph base 6, echo=FALSE}
+
+############ COMPOSICION DEL SEXO EN EL TIEMPO POR MARCA########################
+
+
+p <- allcomics %>%
+  mutate(text = fct_reorder(SEX, YEAR)) %>% # Reorder data
+  ggplot( aes(x=text, y=YEAR, fill=text, color=text)) +
+  geom_violin(width=2.1, size=0.2) +
+  scale_fill_viridis(discrete=TRUE) +
+  scale_color_viridis(discrete=TRUE) +
+ theme_ipsum() +
+  theme(
+    legend.position="none"
+  ) +
+  coord_flip() + # This switch X and Y axis and allows to get the horizontal version
+  xlab("") +
+  ylab("Año")+
+    facet_grid(~BRAND)+
+labs(title = 'MARCAS: SEXO VS TIEMPO');p
+
+```
+
+
+Podemos observar que ambas marcas dan casi la misma importancia a la aparición de personajes de géneros alternativos (Guardando la relación sobre la cantidad de personajes que cada una tiene). Si acaso cabe resaltar, los géneros que utiliza MARVEL Cómics suelen ser más diversos: Pansexual, Transexuales, etc., mientras que DC se encasilla en los tradicionales: Homosexual y Bisexual.
+
+
+```{r graph base 7, echo=FALSE}
+
+############ COMPOSICION DEL GENERO EN EL TIEMPO POR MARCA########################
+ggplot(allcomics,aes(x=GSM,fill=BRAND))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position = position_stack(vjust = .5))+
+  coord_flip()+
+  theme_tinyhand()+
+   labs(title = 'MARCAS: GENEROS VS CANTIDAD') +
+    facet_grid(~BRAND)+
+  ylab("Cantidad de Personajes")+
+  xlab("Géneros")
+
+```
+
+Este gráfico nos permite observar cómo cada marca ha empezado a lanzar sus personajes según cada género, de lo cual:
+- DC, a pesar de tener un corte más conservador, es pionera en la incursión personajes del tipo BISEXUAL, aunque su frecuencia no empieza sino hasta los años 80´s
+- MARVEL, casi desde el inicio ha incluido personajes del tipo HOMOSEXUAL, dentro de sus cómics. No es sino hasta los años 70's, que empiezan a incluirse más personajes de este género.
+
+
+```{r graph base 8, echo=FALSE}
+p <- allcomics %>%
+  mutate(text = fct_reorder(GSM, YEAR)) %>% # Reorder data
+  ggplot( aes(x=text, y=YEAR, fill=text, color=text)) +
+  geom_violin(width=2.1, size=0.2) +
+  scale_fill_viridis(discrete=TRUE) +
+  scale_color_viridis(discrete=TRUE) +
+  theme_ipsum() +
+  theme(
+    legend.position="none"
+  ) +
+  coord_flip() + # This switch X and Y axis and allows to get the horizontal version
+  xlab("") +
+  ylab("Año")+
+    facet_grid(~BRAND)+
+labs(title = 'MARCAS: GENEROS VS TIEMPO');p
+
+
+
+```
+
+Aquí podemos observar cómo se distribuyen los géneros alternativos acorde al sexo. En las categorías HOMOSEXUAL, GENDERFLUID, TRANSVESTITES y AGENDER predomina el masculino, mientras que, en BISEXUAL, PANSEXUAL, TRANSGENDER predomina el femenino.
+
+
+
+```{r Graficos de Apariciones 1, echo=FALSE}
+#CARACTERISTICAS: SEXO VS GSM
+allcomics %>%
+  filter(GSM!="Heterosexual Characters") %>%
+ggplot(aes(x=factor(GSM),fill=factor(SEX)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+   labs(title = 'CARACTERISTICAS: GÉNERO ALTERNATIVOS VS SEXO')+
+  xlab("ALIGN (Género)")+
+  ylab("Cantidad de Personajes")
+```
+
+### Gráficos relacionados a las apariciones
+
+Este apartado contiene gráficos relacionados a la cantidad de apariciones de los personajes de cada marca de cómic.
+
+En el primer gráfico, observamos el TOP 10 de personajes con mayores apariciones en toda la historia. Podemos observar la clara predominancia de MARVEL (8) contra DC (2). 
+
+
+```{r Graficos de Apariciones 2, echo=FALSE}
+
+#################################################################################################
+
+ggplot(topcomics, aes(x=reorder(name, -APPEARANCES), y=APPEARANCES,fill=BRAND,label=APPEARANCES)) + 
+  geom_bar(stat = "identity") +
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+    geom_text(size = 3, position = position_stack(vjust = 0.5))+
+     labs(title = 'APARICIONES: Top 10 APARICIONES TOTALES')
+```
+
+
+Luego podemos ver la distribución de estos personajes por SEXO y BANDO, observando que todos son MALE y la mayoría héroes (GOOD CHARACTERS)
+
+```{r Graficos de Apariciones 3, echo=FALSE}
+topcomics %>%
+  ggplot( aes(x=SEX, y=APPEARANCES/1000, fill=ALIGN)) +
+    geom_boxplot() +
+    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+    geom_jitter(color="black", size=0.4, alpha=0.9) +
+    theme_ipsum() +
+    theme(
+      legend.position="top",
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("APARICIONES TOP 10: DISTRIBUCION SEXO VS BANDO ") +
+    ylab("APARICIONES EN MILES")+
+    xlab("SEXO")
+
+
+```
+
+Este gráfico nos permite apreciar el TOP 10 de los personajes que tienen mayo recurrencia anual, aquí podemos observar que los principales personajes de ambas casas MARVEL (6), y DC (4), hacen casi el mismo número de apariciones anuales en promedio.
+
+
+
+```{r Graficos de Apariciones 4, echo=FALSE}
+
+ggplot(topcomicsPerYear, aes(x=reorder(name, -MEDIA.APARICIONES.ANIO), y=floor(MEDIA.APARICIONES.ANIO),fill=BRAND,label=floor(MEDIA.APARICIONES.ANIO))) + 
+  geom_bar(stat = "identity") +
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+    geom_text(size = 3, position = position_stack(vjust = 0.5))+
+     labs(title = 'APARICIONES: Top 10 APARICIONES ANUALES')
+
+```
+
+El siguiente gráfico permite observar el promedio de apariciones de un personaje según el SEXO, se aprecia que el promedio para personajes FEMALE es menor en DC, pero superior en MARVEL.
+
+```{r Graficos de Apariciones 5, echo=FALSE}
+# PROMEDIO DE APARICIONES SEGUN SEXO
+ggplot(allcomics,  aes(x = SEX,  y=APPEARANCES, fill = SEX)) + 
+   stat_summary_bin(fun.y = mean, geom = "bar") + 
+ #  scale_fill_grey() + 
+   coord_flip() +
+   theme_classic() +
+   theme(legend.position = 'top') +  
+   labs(title = 'APARICIONES: PROMEDIO SEGUN EL SEXO')+
+    facet_grid(~BRAND)
+
+```
+
+Este gráfico en cambio nos permite ver el promedio de apariciones de un personaje según su GÉNERO, llama la atención que el género TRANSVESTITES tenga el mayor promedio, y esto se debe a que es un único personaje de este tipo, con un alto número de apariciones (500+).
+
+```{r Graficos de Apariciones 6, echo=FALSE}
+
+# PROMEDIO DE APARICIONES SEGUN GENERO
+ggplot(allcomics,  aes(x = GSM,  y=APPEARANCES, fill = GSM)) + 
+   stat_summary_bin(fun.y = mean, geom = "bar") + 
+ #  scale_fill_grey() + 
+   coord_flip() +
+   theme_classic() +
+   theme(legend.position = 'top') +  
+   labs(title = 'APARICIONES: PROMEDIO SEGUN EL GENERO')+
+    facet_grid(~BRAND)
+
+```
+
+Para entender mejor el gráfico anterior, se presenta una alternativa que nos permite observar este fenómeno de la aparición de personajes a través del tiempo. En este gráfico. se observa CADA GENERO, con la SUMA DE APARICIONES en cada DECADA, se puede observar 
+- Las apariciones de personajes del tipo HOMOSEXUAL se mantienen desde 1940, sin tener incrementos significativos.
+- Las apariciones de tipo BISEXUAL incrementaron en los 60´s y se encuentran en declive
+- Las apariciones de AGENDER se mantienen.
+- Los de género HETEROSEXUAL DE 1960, son los personajes con mayores números de apariciones de la historia.
+
+
+```{r Graficos de Apariciones 7, echo=FALSE}
+sexo_personajes %>%
+  mutate(sexo = factor(SEX)) %>%
+  ggplot(aes(x=DECADA.APARICION, y=GSM, size=totalAppearances, color=GSM)) +
+      geom_point(alpha=0.9)+
+    scale_size(range = c(.1, 18), name="APARICIONES") +
+    scale_fill_viridis(discrete=TRUE, guide=FALSE, option="A") +
+    theme_ipsum() +
+    ylab("Cantidad de Aparaciones en la Decada") +
+    xlab("Decadas") +
+     theme_classic() +
+    theme(legend.position = "bottom")+   
+  labs(title = 'APARICIONES: GENEROS')+
+  facet_wrap(~SEX)
+
+
+```
+
+Podemos analizar mejor los géneros si excluimos al Heterosexual. ya que su presencia en el gráfico distorsiona las dimensiones de los géneros alternativos. En este gráfico, podemos observar que si bien es cierto ambas marcas son inclusivas, MARVEL suele dar mayor cantidad de apariciones a sus personajes de género alternativo, e incluso con mayor diversidad.
+
+
+```{r Graficos de Apariciones 8, echo=FALSE}
+sexo_personajes %>%
+  filter(GSM!="Heterosexual Characters") %>%
+  mutate(sexo = factor(SEX)) %>%
+  ggplot(aes(x=DECADA.APARICION, y=GSM, size=totalAppearances, color=SEX)) +
+      geom_point(alpha=0.5)+
+#    geom_point(alpha=0.5, shape=21, color="black") +
+    scale_size(range = c(.1, 24), name="APARICIONES") +
+    scale_fill_viridis(discrete=TRUE, guide=FALSE, option="A") +
+    theme_ipsum() +
+    ylab("Cantidad de Aparaciones en la Decada") +
+    xlab("Decadas") +
+       theme_classic() +
+    theme(legend.position = "bottom")+   
+  labs(title = 'APARICIONES: GENEROS ALTERNATIVOS')+
+    facet_grid(~BRAND)
+
+#################################################################################################
+
+```
+
+
+### Gráficos relacionados al paso del tiempo
+
+El primer gráfico representa los 10 personajes más antiguos del conjunto de datos, se puede observar que todos pertenecen a la marca DC comics.
+
+
+```{r Graficos de Tiempo, echo=FALSE}
+
+ ggplot(oldestcomics, aes(x=reorder(name, FECHA.APARICION), y=factor(YEAR),fill=BRAND,label=FECHA.APARICION)) + 
+  geom_bar(stat = "identity") +
+   theme_classic() +
+   theme(legend.position = 'right')+
+  theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+     geom_text(size = 3, angle = 45, position = position_stack(vjust = 0.5))+
+     labs(title = 'TIEMPO: TOP 10 PERSONAJES MAS ANTIGUOS') 
+
+```
+
+
+En un gráfico de la distribución por SEXO de estos personajes, vemos que la gran mayoría son MALE CHARACTERS (hombres).
+
+  
+```{r Graficos de Tiempo 2, echo=FALSE}
+
+oldestcomics %>%
+  ggplot( aes(x=SEX, y=MEDIA.APARICIONES.ANIO, fill=ALIGN)) +
+    geom_boxplot() +
+    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+    geom_jitter(color="black", size=0.4, alpha=0.9) +
+    theme_ipsum() +
+    theme(
+      legend.position="top",
+      plot.title = element_text(size=11)
+    ) +
+       theme_classic() +
+    ggtitle("TIEMPO: DISTRIBUCION TOP 10 PERS. ANTIGUOS") +
+    ylab("Media de Apariciones anuales")
+
+```
+
+
+Este gráfico, nos permite observar que la cantidad de apariciones de personajes según el SEXO y la marca a través del tiempo.
+
+En ambas marcas, hay tendencias similares a la aparición de personajes para ambos sexos.
+
+```{r Graficos de Tiempo 3, echo=FALSE}
+
+ggplot(allcomics,aes(x=factor(SEX),fill=factor(DECADA.APARICION)))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),angle=90,stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'TIEMPO: PERSONAJES A TRAVES DEL TIEMPO') +
+    facet_grid(~BRAND)+
+  ylab("Cantidad de Personajes")+
+  xlab("Décadas")
+
+```
+
+### Gráficos de características de los personajes
+
+En este gráfico, podemos observar que:
+
+- La proporción entre héroes y villanos en DC, es muy similar a través del tiempo, pero en MARVEL, hay más apariciones de persones del tipo villano, especialmente en la década de los 90´s.
+
+
+```{r caracteristicas 1, echo=FALSE}
+
+
+#CARACTERISTICAS: BANDOS POR DECADAS
+ggplot(allcomics,aes(x=factor(DECADA.APARICION),group=ALIGN,shape=ALIGN,color=ALIGN))+
+geom_line(stat = "count")+
+   labs(title = 'CARACTERISTICAS: BANDOS POR DECADAS') +
+    theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+    facet_grid(~BRAND) +
+    ylab("Cantidad de Personajes")+
+  xlab("Décadas")
+
+
+```
+
+En este gráfico, expande un poco lo observado en el anterior, agregando la dimensión del sexo. Podemos ver que tanto en DC como en MARVEL, los villanos suelen ser MALE CHARACTERS (hombres), y confirmamos que en MARVEL la cantidad de villanos excede con creces a los héroes.
+
+
+```{r caracteristicas 2, echo=FALSE}
+
+#CARACTERISTICAS: SEXO VS BANDA VS MARCA
+ggplot(allcomics,aes(x=factor(BRAND),fill=ALIGN))+
+    geom_bar(position="dodge")+
+    geom_text(aes(label=..count..),stat='count',position=position_dodge(0.9),vjust=-0.2)+
+   labs(title = 'CARACTERISTICAS: SEXO VS BANDO VS MARCA') +
+    facet_grid(~SEX)+
+    ylab("Cantidad de Personajes")+
+  xlab("Marca")
+
+```
+
+
+Este gráfico, nos permite ver las combinaciones de características físicas (HAIR y EYE) predominantes. Las combinaciones más frecuentes son: 
+
+- Ojos Negros y cabello negro.
+- Ojos Azules y cabello rubio, café o negro.
+- Ojos cafés y cabello negro o café.
+
+
+```{r caracteristicas 3, echo=FALSE}
+caracteristicas %>%
+  filter(HAIR!="NOT SPECIFIED") %>%
+  filter(EYE!="NOT SPECIFIED") %>%
+  ggplot(aes(x=EYE, y=HAIR, size=count, color=EYE)) +
+      geom_point(alpha=0.5)+
+#    geom_point(alpha=0.5, shape=21, color="black") +
+    scale_fill_viridis(discrete=TRUE, guide=FALSE, option="A") +
+    theme_ipsum() +
+    ylab("Color de Cabello") +
+    xlab("Color de Ojos") +
+     theme_classic() +
+    theme(legend.position = "none")+   
+    theme(axis.text.x=element_text(angle = -45, hjust = 0))+
+  labs(title = 'MATRIZ DE CARACTERISTICAS FISICAS')
+
+```
+
+# Reglas de Asociación: ¿Hay patrones ocultos en las características de los personajes?
+
+Para responder a esta pregunta, se utilizará el algoritmo A PRIORI, buscando patrones de las siguientes características:
+
+- Soporte: igual o mayor al 5% del conjunto de datos.
+- Confianza: igual o mayor al 70%.
+- Umbral de Lift: igual o mayor a 1.
+
+```{r, echo=FALSE}
+#REGLAS DE ASOCIACIÓN
+
+#Parámetros a optimizar
+soporte=0.08
+confianza=0.8
+umbral_lift=1
+
+#Creamos un nuevo dataset para trabajar con las variables que más nos interesan
+allcomics_aso<-allcomics
+allcomics_aso$APPEARANCES<-NULL
+allcomics_aso$page_id<-NULL
+allcomics_aso$name<-NULL
+allcomics_aso$NAME.LENGTH<-NULL
+allcomics_aso$URL.LENGTH<-NULL
+allcomics_aso$urlslug<-NULL
+allcomics_aso$FECHA.APARICION<-NULL
+allcomics_aso$MEDIA.APARICIONES.ANIO<-NULL
+allcomics_aso$ANIOS.DESDE.APARICION<-NULL
+allcomics_aso$MES.APARICION<-NULL
+allcomics_aso$YEAR<-NULL
+allcomics_aso$TRIMESTRE.APARICION<-NULL
+allcomics_aso$GSM<-NULL
+allcomics_aso$DECADA.APARICION<-factor(allcomics_aso$DECADA.APARICION)
+
+
+```
+
+Para depurar los antecedentes no deseados: (categorías vacias: NOT SPECIFIED) y consecuentes obvios (categorías con más del 70% de frecuencia: Marvel, Male, Heterosexual), utilizaremos un ciclo FOR, para cargar la lista de elementos sobre la cual buscaremos las reglas existentes.
+
+
+```{r}
+
+#Nos creamos todas las combinaciones de atributos para seleccionar solo los que nos interesen más
+factores<-c(sapply(allcomics_aso, levels))
+i=0
+l<-c()
+for(factor in factores)
+{
+  i=i+1
+  atrib=names(factores)[i]
+  for(elemento in factor)
+  {
+    if(elemento!="MARVEL" && elemento!="NOT SPECIFIED" && elemento!="Heterosexual Characters" && elemento!="Male Characters"){
+      l<-c(l,paste(atrib,"=",elemento,sep = ""))
+    }
+    
+  }
+}
+#detach("package:arulesViz", unload=TRUE)
+#detach("package:arules", unload=TRUE)
+#search() 
+#unloadNamespace("arules") 
+#update.packages("arules") 
+
+```
+
+Ejecutamos el algoritmo A PRIORI.
+
+```{r}
+
+reglas <- apriori(allcomics_aso, parameter = list(minlen=1, supp=soporte, conf=confianza), appearance = list(both=l), control = list(verbose=F))
+reglas<-subset(reglas, subset = lift > umbral_lift)
+reglas.ord <- sort(reglas, by="support")
+inspect(reglas.ord)
+```
+
+Revisamos la existencia de reglas redundantes (aquellas que son subconjunto de otra).
+
+```{r}
+
+
+subset.matrix <- is.subset(reglas.ord, reglas.ord)
+subset.matrix
+
+subset.matrix <- subset.matrix*1
+subset.matrix
+
+```
+
+Podemos observar que dentro de las reglas detectadas no hay reglas redundantes (ninguna tiene el valor TRUE, en la matriz de búsqueda de redundancia, al menos de las reglas encontradas con los valores de confianza y soporte previamente definidos).
+```{r}
+diag(subset.matrix) <- 0
+redundantes <- colSums(subset.matrix, na.rm=T) >= 1
+redundantes
+
+```
+
+Podemos observar que dentro de las reglas detectadas no hay reglas redundantes (con los valores de confianza y soporte previamente definidos.)
+
+- Si el personaje apareció en la década de los 90´s está vivo, con un soporte de 0,19 y una confianza de 0.8
+- Si el personaje tiene identidad pública, y es héroe, está vivo, con un soporte de 0,10 y una confianza de 0.81
+-Si el personaje es héroe, y es femenino, está vivo, con un soporte de 0.87 una confianza de 0.82
+
+```{r}
+
+#reglas.dep <-reglas.ord[redundantes]
+reglas.dep <-reglas.ord
+inspect(reglas.dep)
+```
+
+Gráficamente podemos observar las reglas y consecuentes expuestos anteriormente.
+
+```{r}
+par(mfrow=c(4,1))
+plot(reglas.dep,method="graph")
+plot(reglas.dep[1,],method="paracoord")
+plot(reglas.dep[2,],method="paracoord")
+plot(reglas.dep[3,],method="paracoord")
+
+
+```
+
+# Machine Learning: ¿Es posible predicción de cantidad de apariciones de un personaje con precisión?
+
+A través de un modelo de regresión, del tipo RANDOM FOREST, procederemos a predecir la cantidad de apariciones de un personaje, basándonos en varias variables del conjunto de datos, tales como la fecha de aparición del personaje, las características físicas, la longitud del nombre, y la marca.
+
+El primer paso es graficar las dimensiones de la variable a predecir APPEARANCES, para tener una mejor idea de su comportamiento.
+
+<p>
+  <a class="btn btn-info btn-sm" data-toggle="collapse" data-target="#collapseToggle29" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Mostrar/Ocultar codigo
+  </a>
+</p>
+
+<div class="collapse" id="collapseToggle29">
+  <div class="card card-body">
+
+```{r}
+
+ggplot(allcomics)+
+  aes(x=FECHA.APARICION,y=APPEARANCES, colour=ALIGN)+
+  geom_point()+
+  geom_smooth(method = 'lm', color = 'red3', fill = 'red3')+   
+  labs(title = 'CANTIDAD DE APARICIONES DEL PERSONAJES')+
+  facet_grid(~BRAND)
+
+```
+
+</div>
+</div>
+<br>
+Se puede observar que hay cierta correlación negativa, que indica que mientras más antiguo es el personaje, es más probable que tenga un mayor número de apariciones. 
+
+Una vez que tenemos una idea del comportamiento de la variable APPEARANCES, convertimos el formato del resto de variables a numérico, para que pueda ser utilizado por el algoritmo RF.
+
+<p>
+  <a class="btn btn-info btn-sm" data-toggle="collapse" data-target="#collapseToggle30" role="button" aria-expanded="false" aria-controls="collapseExample">
+    Mostrar/Ocultar codigo
+  </a>
+</p>
+
+<div class="collapse" id="collapseToggle30">
+  <div class="card card-body">
+
+```{r}
+
+which(is.na(allcomics))
+str(allcomics)
+allcomics_ML <-allcomics
+allcomics_ML$FECHA.APARICION<-factor(allcomics_ML$FECHA.APARICION)
+allcomics_ML$FECHA.APARICION<-as.numeric(allcomics_ML$FECHA.APARICION)
+allcomics_ML$ID<-as.numeric(allcomics_ML$ID)
+allcomics_ML$ALIGN<-as.numeric(allcomics_ML$ALIGN)
+allcomics_ML$EYE<-as.numeric(allcomics_ML$EYE)
+allcomics_ML$HAIR<-as.numeric(allcomics_ML$HAIR)
+allcomics_ML$SEX<-as.numeric(allcomics_ML$SEX)
+allcomics_ML$GSM<-as.numeric(allcomics_ML$GSM)
+allcomics_ML$ALIVE<-as.numeric(allcomics_ML$ALIVE)
+allcomics_ML$MES.APARICION<-as.numeric(allcomics_ML$MES.APARICION)
+allcomics_ML$BRAND<-as.numeric(allcomics_ML$BRAND)
+
+
+```
+
+</div>
+</div>
+Para evitar que las escalas creen un sesgo en el modelo, es conveniente transformar los valores a escala logarítmica
+
+```{r}
+allcomics_ML <- mutate(allcomics_ML,
+                       page_id = log10(page_id + 1),
+                       ID = log10(ID + 1),
+                       ALIGN = log10(ALIGN + 1),
+                       EYE = log10(EYE + 1),
+                       HAIR = log10(HAIR + 1),
+                       SEX = log10(SEX + 1),
+                       GSM = log10(GSM + 1),
+                       ALIVE = log10(ALIVE + 1),
+                       APPEARANCES = log10(APPEARANCES + 1),
+                       YEAR = log10(YEAR + 1),
+                       NAME.LENGTH = log10(NAME.LENGTH + 1),
+                       URL.LENGTH = log10(URL.LENGTH + 1),
+                       FECHA.APARICION = log10(FECHA.APARICION + 1),
+                       ANIOS.DESDE.APARICION = log10(ANIOS.DESDE.APARICION + 1),
+                       MES.APARICION = log10(MES.APARICION + 1),
+                       TRIMESTRE.APARICION = log10(TRIMESTRE.APARICION + 1),
+                       DECADA.APARICION = log10(DECADA.APARICION + 1),
+                       BRAND = log10(BRAND + 1))
+
+
+```
+
+Revisamos la estructura del DATASET, para depurar y eliminar aquellas variables incompatibles (tipo character) o aquellas que son redundantes, y las que hemos calculado durante el análisis exploratorio que harían trivial la predicción (Por ejemplo: Media de Apariciones por Año.)
+
+```{r}
+str(allcomics_ML)
+summary(allcomics_ML)
+
+#REMOCION DE VARIABLES REDUNDANTES Y DE AQUELLAS QUE NO TIENEN RELEVANCIA EN LA PREDICCION DE LAS APARICIONES
+allcomics_ML[ ,c('name','urlslug','MEDIA.APARICIONES.ANIO','ANIOS.DESDE.APARICION','MES.APARICION','DECADA.APARICION','YEAR','GSM','ALIVE')] <- list(NULL)
+
+
+```
+
+Dividimos el conjunto de datos en TRAIN y TEST, usando la función SAMPLE y la regla del 80/20.
+
+```{r}
+
+set.seed(123)   #  set seed to ensure you always have same random numbers generated
+sample = sample.split(allcomics_ML,SplitRatio = 0.8) # splits the data in the ratio mentioned in SplitRatio. After splitting marks these rows as logical TRUE and the the remaining are marked as logical FALSE
+train =subset(allcomics_ML,sample ==TRUE) # creates a training dataset named train1 with rows which are marked as TRUE
+test=subset(allcomics_ML, sample==FALSE)
+
+test$APARICIONES.ORIGINALES <- test$APPEARANCES
+test[ ,c('APPEARANCES')] <- list(NULL)
+
+```
+
+Creamos el modelo de predicción de las apariciones con RF.
+
+```{r}
+
+
+
+set.seed(222)
+rf_model <- randomForest(APPEARANCES ~ .,
+                         data = train, 
+                         ntree = 501,
+                         replace = TRUE,
+                         nodesize = 9,
+                         importance = TRUE); print(rf_model)
+
+```
+
+<b>
+Conclusión
+</b>
+
+Se puede predecir la cantidad de apariciones con una precisión ACEPTABLE, ya que el modelo tiene las siguientes medidas de bondad:
+
+-  Mean of squared residuals 0.122
+- % Var Explained de 53
+
+Esto se debe a que las variables predictoras muestran bajas correlaciones que no permiten que el modelo sea más preciso a la hora de pronosticar un valor. 
+
+Luego, procedemos a revisar las variables que el modelo detecto como importantes para la predicción.
+
+```{r}
+
+# Create an object for importance of variables
+importance <- importance(rf_model) 
+
+# Create data frame using importance. 
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[,'IncNodePurity'], 0))
+Imp<-varImp(rf_model,scale= FALSE)
+Imp
+# Create interactive plot.
+ggplotly(ggplot(varImportance, aes(x = reorder(Variables, Importance), 
+                           y = Importance, fill = Importance)) +
+       geom_bar(stat='identity') + 
+       labs(title = 'Importancia del predictor', x = 'Predictor', y = 'RMSLE') +
+       coord_flip() + 
+       theme_light())
+
+```
+
+Realizamos la predicción en el conjunto de datos de TEST, posterior a ello, almacenamos las predicciones en un dataframe SOLUCION.
+
+```{r}
+prediction <- predict(rf_model, test)
+
+solution <- test
+
+solution$APPEARANCES.PREDICTED<-prediction
+
+```
+
+Es importante recordar que se debe reversar la escala logarítmica para tener el valor de apariciones predicho final. Luego se guarda en disco dicho archivo.
+
+```{r}
+#se reversa la transformación logarítmica de los ingresos antes de exportar los resultados
+solution <- as_tibble(solution) %>%
+   mutate(page_id=10^page_id,APPEARANCES.PREDICTED = ceiling(10^APPEARANCES.PREDICTED),APARICIONES.ORIGINALES = 10^APARICIONES.ORIGINALES)
+
+solution<-merge(solution, allcomics[, c("page_id", "name")], by="page_id")
+
+write.csv(solution, file = 'prediccion_cantidad_apariciones.csv', row.names = F)
+
+```
+

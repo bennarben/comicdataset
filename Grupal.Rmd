@@ -468,7 +468,7 @@ marvel<-subset(marvel, !is.na(marvel$Year))
 
 ```
 
-Para la variable APPEARANCES, es necesaria la creación de un modelo de regresión lineal que calcule las apariciones de los datos faltantes. esta será creada luego de la fase de ETL, en que se normalicen los datos que serán insumos para ese modelo.
+Para la variable APPEARANCES, es necesaria la creación de un modelo de regresión lineal que calcule las apariciones de los datos faltantes. Esta será creada luego de la fase de ETL, en la que se normalizaran los datos que serán insumos para ese modelo.
 
 </div>
 </div>
@@ -616,9 +616,12 @@ En esta sección realizaremos un análisis de la correlación dentro de cada con
 #################################################################
 #############INICIO CORRELACION DE VARIABLES#####################
 #################################################################
-dccorrelation<-dc[,-13:-20]
+dccorrelation<-dc[,-15:-20]
+
+#estos atributos son nulos en análisis ya que vienen representados por URL.LENGTH Y NAME.LENGTH
 dccorrelation$name<-NULL
 dccorrelation$urlslug<-NULL
+
 dccorrelation$ID<-as.numeric(dccorrelation$ID)
 dccorrelation$ALIGN<-as.numeric(dccorrelation$ALIGN)
 dccorrelation$HAIR<-as.numeric(dccorrelation$HAIR)
@@ -652,6 +655,10 @@ En el diagrama escogido para representar la correlación, los PIE CHARTS represe
 
 - APPEARANCES (la cantidad de apariciones del personaje) guarda una correlación inversa con el año de aparición del personaje, lo cual puede sonar lógico, mientras más tiempo tiene un personaje, es más probable que acumule más apariciones.
 
+- NAME.LENGTH(cantidad de carácteres que posee el nombre de un personaje) posee cierta correlación inversa con page_id y EYE. Hay que destacar la gran correlación que existe entre NAME.LENGTH y URL.LENGTH.
+
+- URL.LENGTH (cantidad de carácteres que posee la url de la página del personaje) posee cierta correlación inversa con page_id y EYE, al igual que ocurre en NAME.LENGTH.
+
 - Se puede observar que la correlación es prácticamente nula en el resto de las variables, esto tendrá un impacto en los modelos de clasificación o regresión que se realicen.
 
 ## Correlación Marvel
@@ -660,7 +667,7 @@ En esta sección realizaremos un análisis de la correlación dentro de cada con
 
 ```{r COR Marvel}
 
-marvelcorrelation<-marvel[,-13:-20]
+marvelcorrelation<-marvel[,-15:-20]
 marvelcorrelation$name<-NULL
 marvelcorrelation$urlslug<-NULL
 marvelcorrelation$ID<-as.numeric(marvelcorrelation$ID)
@@ -749,7 +756,7 @@ Estableceremos la correlación para el conjunto de datos que contiene los COMICS
 #############INICIO CORRELACION DE VARIABLES#####################
 #################################################################
 
-allcomicscorrelation<-allcomics[,-13:-20]
+allcomicscorrelation<-allcomics[,-15:-20]
 allcomicscorrelation$ID<-as.numeric(allcomicscorrelation$ID)
 allcomicscorrelation$ALIGN<-as.numeric(allcomicscorrelation$ALIGN)
 allcomicscorrelation$SEX<-as.numeric(allcomicscorrelation$SEX)
@@ -782,6 +789,10 @@ Como conclusión, la matriz de correlación de todos los comics, tiene el siguie
 - GSM muestra correlaciones inversas con EYE y HAIR, puede denotar que los personajes con GENEROS ALTERNATIVOS tienen ciertas características EYE y HAIR distintivas.
 
 - APPEARANCES (la cantidad de apariciones del personaje) guarda una correlación inversa con el año de aparición del personaje, lo cual puede sonar lógico, mientras más tiempo tiene un personaje, es más probable que acumule más apariciones.
+
+- NAME.LENGTH(cantidad de carácteres que posee el nombre de un personaje) posee cierta correlación inversa con EYE. Hay que destacar la gran correlación que existe entre NAME.LENGTH y URL.LENGTH.
+
+- URL.LENGTH (cantidad de carácteres que posee la url de la página del personaje) posee cierta correlación inversa con page_id, EYE y HAIR.
 
 - Se puede observar que la correlación es prácticamente nula en el resto de las variables, esto tendrá un impacto en los modelos de clasificación o regresión que se realicen.
 
@@ -1019,6 +1030,7 @@ ggplot(generosalt, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=GSM)) +
   theme_void() +
   theme(legend.position = "right")+
    labs(title = 'COMPOSICION: GENEROS ALTERNATIVOS')
+
 
 ```
 
@@ -1586,7 +1598,7 @@ Revisamos la estructura del DATASET, para depurar y eliminar aquellas variables 
 str(allcomics_ML)
 summary(allcomics_ML)
 
-#REMOCION DE VARIABLES REDUNDANTES Y DE AQUELLAS QUE NO TIENEN RELEVANCIA EN LA PREDICCION DE LAS APARICIONES
+#ELIMINACIÓN DE VARIABLES REDUNDANTES Y DE AQUELLAS QUE NO TIENEN RELEVANCIA EN LA PREDICCION DE LAS APARICIONES
 allcomics_ML[ ,c('name','urlslug','MEDIA.APARICIONES.ANIO','ANIOS.DESDE.APARICION','MES.APARICION','DECADA.APARICION','YEAR','GSM','ALIVE')] <- list(NULL)
 
 

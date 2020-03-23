@@ -971,10 +971,17 @@ for(factor in factores)
 reglas <- apriori(allcomics_aso, parameter = list(minlen=1, supp=soporte, conf=confianza), appearance = list(both=l), control = list(verbose=F))
 reglas<-subset(reglas, subset = lift > umbral_lift)
 reglas.ord <- sort(reglas, by="lift")
-diag(subset.matrix) <- 0
-redundantes <- colSums(subset.matrix, na.rm=T) >= 1
-reglas.dep <-reglas.ord[redundantes]
-inspect(reglas.dep)
+#Todas las reglas ordenadas
+inspect(reglas.ord)
+
+#Todas las reglas ordenadas sin redundancia
+inspect(reglas.ord[!is.redundant(reglas.ord)])
+
+#Conclusiones: 
+# Los personajes sin pelo suelen ser de MARVEL
+# La mayoría de los personajes malos de los años 40 eran hombres
+# Los personajes buenos de MARVEL suelen sobrevivir
+# Los personajes buenos y de pelo negro suelen sobrevivir
 ```
 
 # Predicción de Cantidad de Apariciones, a traves de RANDOM FOREST
